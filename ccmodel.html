@@ -13,7 +13,7 @@
         input[type="range"] { 
             width: 100%; 
             height: 3px; 
-            background: #e5e7eb;  /* Will be overridden by JS */
+            background: #e5e7eb;
             border-radius: 3px; 
             outline: none; 
             -webkit-appearance: none; 
@@ -35,12 +35,16 @@
             border-radius: 50%; 
             cursor: pointer; 
         }
+        .warning-box { padding: 12px; background: #fef3c7; border: 2px solid #f59e0b; border-radius: 6px; margin-bottom: 12px; font-size: 13px; line-height: 1.5; }
+        .error-box { padding: 12px; background: #fee2e2; border: 2px solid #dc2626; border-radius: 6px; margin-bottom: 12px; font-size: 13px; line-height: 1.5; }
+        .success-box { padding: 12px; background: #dcfce7; border: 2px solid #22c55e; border-radius: 6px; margin-bottom: 12px; font-size: 13px; line-height: 1.5; }
     </style>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState } = React;
+        const { useState, useEffect, useRef } = React;
+        
         const updateSliderBackground = (slider) => {
           const min = parseFloat(slider.min);
           const max = parseFloat(slider.max);
@@ -48,8 +52,24 @@
           const percentage = ((val - min) / (max - min)) * 100;
           slider.style.background = `linear-gradient(to right, #331A38 0%, #331A38 ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`;
         };
+
         function StoveStackingWidget() {
+          // Payment method
           const [paymentMethod, setPaymentMethod] = useState('upfront');
+          
+          // Financing parameters
+          const [depositPercent, setDepositPercent] = useState(20);
+          const [loanTermYears, setLoanTermYears] = useState(2);
+          const [annualInterestRate, setAnnualInterestRate] = useState(30);
+          
+          // PAYG parameters
+          const [paygTermYears, setPaygTermYears] = useState(2);
+          const [paygPremiumPercent, setPaygPremiumPercent] = useState(70);
+          
+          // Household income for affordability
+          const [monthlyHouseholdIncome, setMonthlyHouseholdIncome] = useState(80);
+          
+          // Baseline parameters
           const [baselineFuelCost, setBaselineFuelCost] = useState(140);
           const [stacking, setStacking] = useState(50);
           const [timeReallocationPct, setTimeReallocationPct] = useState(0);
@@ -57,9 +77,13 @@
           const [baselineFuelCollection, setBaselineFuelCollection] = useState(1.5);
           const [baselineCookingTime, setBaselineCookingTime] = useState(4.8);
           
+          // Technology capital costs
           const [icsCapitalBase, setIcsCapitalBase] = useState(25);
           const [lpgCapitalBase, setLpgCapitalBase] = useState(50);
           const [solarCapitalBase, setSolarCapitalBase] = useState(650);
+          
+          // LPG fuel cost (new adjustable parameter)
+          const [lpgAnnualFuelCost, setLpgAnnualFuelCost] = useState(73);
           
           const technologies = {
             ics: {
@@ -80,7 +104,7 @@
               capitalCost: lpgCapitalBase,
               lifespan: 10,
               fuelType: 'absolute',
-              newFuelCost: 73,
+              newFuelCost: lpgAnnualFuelCost,
               fuelCollectionReduction: 0.70,
               cookingTimeReduction: 0.25,
               pm25Reduction: 0.85,
@@ -103,31 +127,114 @@
             }
           };
           
-          const getPaymentMethodDescription = () => {
-            if (paymentMethod === 'upfront') return 'Full payment upfront, amortized over equipment lifespan';
-            if (paymentMethod === 'financing') return 'Consumer financing adds 50% to total cost (interest + fees)';
-            return 'PAYG/rental model adds 30% annual premium for service + maintenance';
+          // Calculate financing details for a given technology
+          const calculateFinancingDetails = (tech) => {
+            const baseCost = technologies[tech].capitalCost;
+            const lifespan = technologies[tech].lifespan;
+            
+            if (paymentMethod === 'upfront') {
+              return {
+                totalCost: baseCost,
+                depositRequired: baseCost,
+                monthlyPayment: 0,
+                totalInterest: 0,
+                effectiveAnnualCost: baseCost / lifespan,
+                description: 'Full payment upfront'
+              };
+            }
+            
+            if (paymentMethod === 'financing') {
+              const deposit = baseCost * (depositPercent / 100);
+              const principal = baseCost - deposit;
+              const monthlyRate = annualInterestRate / 100 / 12;
+              const numPayments = loanTermYears * 12;
+              
+              let monthlyPayment = 0;
+              if (monthlyRate > 0 && numPayments > 0) {
+                monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
+              } else {
+                monthlyPayment = principal / numPayments;
+              }
+              
+              const totalPaid = deposit + (monthlyPayment * numPayments);
+              const totalInterest = totalPaid - baseCost;
+              
+              return {
+                totalCost: totalPaid,
+                depositRequired: deposit,
+                monthlyPayment: monthlyPayment,
+                totalInterest: totalInterest,
+                effectiveAnnualCost: totalPaid / lifespan,
+                description: `${depositPercent}% deposit + ${loanTermYears}-year loan at ${annualInterestRate}% APR`
+              };
+            }
+            
+            // PAYG (lease-to-own)
+            const totalCost = baseCost * (1 + paygPremiumPercent / 100);
+            const monthlyPayment = totalCost / (paygTermYears * 12);
+            return {
+              totalCost: totalCost,
+              depositRequired: 0,
+              monthlyPayment: monthlyPayment,
+              totalInterest: totalCost - baseCost,
+              effectiveAnnualCost: totalCost / lifespan,
+              description: `Lease-to-own over ${paygTermYears} years, ${paygPremiumPercent}% total premium`
+            };
           };
           
-          const calculateTotalCapitalCost = (tech) => {
-            const spec = technologies[tech];
-            if (paymentMethod === 'upfront') return spec.capitalCost;
-            if (paymentMethod === 'financing') return spec.capitalCost * 1.5;
-            if (paymentMethod === 'rental') return spec.capitalCost * 1.3;
+          // Affordability check
+          const checkAffordability = (monthlyPayment, depositRequired, techName) => {
+            const issues = [];
+            const paymentToIncomeRatio = (monthlyPayment / monthlyHouseholdIncome) * 100;
+            
+            if (paymentToIncomeRatio > 15) {
+              issues.push({ 
+                severity: 'error', 
+                message: `${techName}: Monthly payment (${paymentToIncomeRatio.toFixed(0)}% of income) exceeds safe threshold of 15%. High default risk.` 
+              });
+            } else if (paymentToIncomeRatio > 10) {
+              issues.push({ 
+                severity: 'warning', 
+                message: `${techName}: Monthly payment (${paymentToIncomeRatio.toFixed(0)}% of income) is moderately high. May strain household budget.` 
+              });
+            }
+            
+            if (depositRequired > monthlyHouseholdIncome * 1.5) {
+              issues.push({ 
+                severity: 'error', 
+                message: `${techName}: Deposit ($${Math.round(depositRequired)}) exceeds 1.5 months income. Major access barrier.` 
+              });
+            } else if (depositRequired > monthlyHouseholdIncome * 0.5) {
+              issues.push({ 
+                severity: 'warning', 
+                message: `${techName}: Deposit ($${Math.round(depositRequired)}) exceeds half a month's income. May require savings program.` 
+              });
+            }
+            
+            return { issues, paymentToIncomeRatio };
           };
           
-          const calculateAnnualCapitalCost = (tech) => {
-            const totalCost = calculateTotalCapitalCost(tech);
-            return totalCost / technologies[tech].lifespan;
-          };
+          const icsFinancing = calculateFinancingDetails('ics');
+          const lpgFinancing = calculateFinancingDetails('lpg');
+          const solarFinancing = calculateFinancingDetails('solar');
           
-          const icsCapital = calculateAnnualCapitalCost('ics');
-          const lpgCapital = calculateAnnualCapitalCost('lpg');
-          const solarCapital = calculateAnnualCapitalCost('solar');
+          const icsAffordability = checkAffordability(icsFinancing.monthlyPayment, icsFinancing.depositRequired, 'ICS');
+          const lpgAffordability = checkAffordability(lpgFinancing.monthlyPayment, lpgFinancing.depositRequired, 'LPG');
+          const solarAffordability = checkAffordability(solarFinancing.monthlyPayment, solarFinancing.depositRequired, 'Solar');
           
-          const icsTotalCapital = calculateTotalCapitalCost('ics');
-          const lpgTotalCapital = calculateTotalCapitalCost('lpg');
-          const solarTotalCapital = calculateTotalCapitalCost('solar');
+          const allAffordabilityIssues = [
+            ...icsAffordability.issues,
+            ...lpgAffordability.issues,
+            ...solarAffordability.issues
+          ];
+          
+          const icsCapital = icsFinancing.effectiveAnnualCost;
+          const lpgCapital = lpgFinancing.effectiveAnnualCost;
+          const solarCapital = solarFinancing.effectiveAnnualCost;
+          
+          const icsTotalCapital = icsFinancing.totalCost;
+          const lpgTotalCapital = lpgFinancing.totalCost;
+          const solarTotalCapital = solarFinancing.totalCost;
 
           const calculateFuelCost = (tech) => {
             const spec = technologies[tech];
@@ -135,11 +242,9 @@
             const traditionalUse = stacking / 100;
             
             if (spec.fuelType === 'fraction') {
-              // ICS: uses same fuel as baseline but less of it (35% reduction = 65% of baseline)
               const reducedFuelCost = baselineFuelCost * (1 - spec.fuelReduction);
               return (modernUse * reducedFuelCost) + (traditionalUse * baselineFuelCost);
             } else {
-              // LPG/Solar: different fuel type with fixed cost
               return (modernUse * spec.newFuelCost) + (traditionalUse * baselineFuelCost);
             }
           };
@@ -189,133 +294,121 @@
           const lpgYearsToRepay = lpgNetBenefit > 0 ? technologies.lpg.capitalCost / lpgNetBenefit : null;
           const solarYearsToRepay = solarNetBenefit > 0 ? technologies.solar.capitalCost / solarNetBenefit : null;
 
-          const allValues = [
-            icsCapital, icsFuelSavings, icsTimeValue, Math.abs(icsNetBenefit),
-            lpgCapital, lpgFuelSavings, lpgTimeValue, Math.abs(lpgNetBenefit),
-            solarCapital, solarFuelSavings, solarTimeValue, Math.abs(solarNetBenefit)
-          ];
-          const maxValue = Math.max(...allValues) * 1.2;
-          const scale = 120 / maxValue;
-
+          // Waterfall chart with proper cumulative positioning
           const WaterfallChart = ({ fuelSavings, timeValue, capitalCost, netBenefit, label }) => {
-            const zero = 120;
-            const step1 = zero + (capitalCost * scale);
-            const step2 = step1 - (fuelSavings * scale);
-            const step3 = step2 - (timeValue * scale);
+            const values = [capitalCost, fuelSavings, timeValue, netBenefit];
+            const absValues = values.map(v => Math.abs(v));
+            const maxAbsValue = Math.max(...absValues, 1) * 1.3;
             
-            const barWidth = 40;
+            const chartHeight = 160;
+            const zeroLine = chartHeight / 2;
+            const scale = (chartHeight / 2) / maxAbsValue;
+
+            // Calculate cumulative positions for waterfall
+            let runningTotal = 0;
+            
+            const costStart = runningTotal;
+            runningTotal -= capitalCost;
+            const costEnd = runningTotal;
+            
+            const fuelStart = runningTotal;
+            runningTotal += fuelSavings;
+            const fuelEnd = runningTotal;
+            
+            const timeStart = runningTotal;
+            runningTotal += timeValue;
+            const timeEnd = runningTotal;
+            
+            const netStart = 0;
+            const netEnd = netBenefit;
+
+            const barWidth = 38;
             const gap = 10;
             const totalWidth = (barWidth * 4) + (gap * 3);
+
+            const valueToY = (val) => zeroLine - (val * scale);
+
+            const renderBar = (startVal, endVal, color, labelText, xPos, barLabel) => {
+              const y1 = valueToY(startVal);
+              const y2 = valueToY(endVal);
+              const top = Math.min(y1, y2);
+              const height = Math.max(Math.abs(y2 - y1), 2);
+              const change = endVal - startVal;
+              const isPositive = change >= 0;
+              
+              return (
+                <div style={{ position: 'absolute', left: `${xPos}px` }}>
+                  <div style={{ 
+                    width: `${barWidth}px`,
+                    height: `${height}px`,
+                    position: 'absolute',
+                    top: `${top}px`,
+                    background: color
+                  }}>
+                    <div style={{ 
+                      color: height > 18 ? 'white' : color,
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      textAlign: 'center',
+                      position: height > 18 ? 'relative' : 'absolute',
+                      top: height > 18 ? '3px' : (isPositive ? '-14px' : `${height + 2}px`),
+                      width: '100%',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {labelText}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '10px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: `${chartHeight + 6}px`, lineHeight: '1.2', fontWeight: '500' }}>
+                    {barLabel}
+                  </div>
+                </div>
+              );
+            };
+
+            const renderConnector = (fromVal, xPos) => {
+              const y = valueToY(fromVal);
+              return (
+                <div style={{ 
+                  position: 'absolute', 
+                  left: `${xPos + barWidth}px`, 
+                  top: `${y}px`, 
+                  width: `${gap}px`, 
+                  borderTop: '1px dashed #9ca3af' 
+                }} />
+              );
+            };
             
             return (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>{label}</div>
-                <div style={{ position: 'relative', width: `${totalWidth}px`, height: '250px' }}>
-                  <div style={{ position: 'absolute', width: '100%', borderTop: '1px solid #9ca3af', top: `${zero}px` }} />
-                  <div style={{ position: 'absolute', fontSize: '12px', color: '#6b7280', top: `${zero - 12}px`, left: '-25px' }}>$0</div>
-                  
-                  <div style={{ position: 'absolute', left: '0px' }}>
-                    <div style={{ width: `${barWidth}px`, height: `${Math.abs(capitalCost * scale)}px`, position: 'absolute', top: `${zero}px`, background: '#f97316' }}>
-                      <div style={{ 
-                        color: Math.abs(capitalCost * scale) > 20 ? 'white' : '#FF5533', 
-                        fontSize: '11px', 
-                        fontWeight: '600',
-                        textAlign: 'center', 
-                        position: Math.abs(capitalCost * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(capitalCost * scale) > 20 ? '4px' : '-16px',
-                        width: '100%'
-                      }}>
-                        -${Math.round(capitalCost)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: '230px' }}>
-                      Capital<br/>cost
-                    </div>
-                    <div style={{ position: 'absolute', width: `${gap}px`, left: `${barWidth}px`, top: `${step1}px`, borderTop: '1px dashed #d1d5db' }} />
-                  </div>
-                  
-                  
-                  
-                  <div style={{ position: 'absolute', left: `${barWidth + gap}px` }}>
-                    <div style={{ 
-                      width: `${barWidth}px`, 
-                      height: `${Math.abs(fuelSavings * scale)}px`, 
-                      position: 'absolute', 
-                      top: `${fuelSavings >= 0 ? step2 : step1}px`,  // ← CHANGE THIS LINE
-                      background: fuelSavings >= 0 ? '#60a5fa' : '#f97316'
-                    }}>
-                      <div style={{ 
-                        color: Math.abs(fuelSavings * scale) > 20 ? 'white' : (fuelSavings >= 0 ? '#2563eb' : '#FF5533'),  
-                        fontSize: '11px', 
-                        fontWeight: '600',
-                        textAlign: 'center', 
-                        position: Math.abs(fuelSavings * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(fuelSavings * scale) > 20 ? '4px' : (fuelSavings >= 0 ? '-16px' : `${Math.abs(fuelSavings * scale) + 4}px`), 
-                        width: '100%'
-                      }}>
-                        {fuelSavings >= 0 ? '+' : ''}${Math.round(fuelSavings)} 
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: '230px' }}>
-                      Fuel<br/>savings
-                    </div>
-                    <div style={{ position: 'absolute', width: `${gap}px`, left: `${barWidth}px`, top: `${step2}px`, borderTop: '1px dashed #d1d5db' }} />
-                  </div>                  
-                  
-                  
-<div style={{ position: 'absolute', left: `${(barWidth + gap) * 2}px` }}>
-  <div style={{ 
-    width: `${barWidth}px`, 
-    height: `${Math.abs(timeValue * scale)}px`, 
-    position: 'absolute', 
-    top: `${timeValue >= 0 ? step3 : step2}px`, 
-    background: timeValue >= 0 ? '#22c55e' : '#f97316'
-  }}>
-    <div style={{ 
-      color: Math.abs(timeValue * scale) > 20 ? 'white' : (timeValue >= 0 ? '#16a34a' : '#FF5533'), 
-      fontSize: '11px', 
-      fontWeight: '600',
-      textAlign: 'center', 
-      position: Math.abs(timeValue * scale) > 20 ? 'relative' : 'absolute',
-      top: Math.abs(timeValue * scale) > 20 ? '4px' : (timeValue >= 0 ? '-16px' : `${Math.abs(timeValue * scale) + 4}px`),
-      width: '100%'
-    }}>
-      {timeValue >= 0 ? '+' : ''}${Math.round(timeValue)}
-    </div>
-  </div>
-  <div style={{ fontSize: '11px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: '230px' }}>
-    Time<br/>value
-  </div>
-  <div style={{ position: 'absolute', width: `${gap}px`, left: `${barWidth}px`, top: `${step3}px`, borderTop: '1px dashed #d1d5db' }} />
-</div>
-                  
-                  <div style={{ position: 'absolute', left: `${(barWidth + gap) * 3}px` }}>
-                    <div style={{ width: `${barWidth}px`, height: `${Math.abs(netBenefit * scale)}px`, position: 'absolute', top: `${netBenefit >= 0 ? step3 : zero}px`, background: netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>
-                      <div style={{ 
-                        color: Math.abs(netBenefit * scale) > 20 ? 'white' : (netBenefit >= 0 ? '#16a34a' : '#dc2626'), 
-                        fontSize: '11px', 
-                        fontWeight: '600',
-                        textAlign: 'center', 
-                        position: Math.abs(netBenefit * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(netBenefit * scale) > 20 ? '4px' : (netBenefit >= 0 ? '-16px' : `${Math.abs(netBenefit * scale) + 4}px`),
-                        width: '100%'
-                      }}>
-                        {netBenefit >= 0 ? '+' : ''}${Math.round(netBenefit)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', textAlign: 'center', fontWeight: '600', width: `${barWidth}px`, position: 'absolute', top: '230px' }}>
-                      Net<br/>benefit
-                    </div>
-                  </div>
+                <div style={{ position: 'relative', width: `${totalWidth}px`, height: `${chartHeight + 35}px` }}>
+                  <div style={{ position: 'absolute', width: '100%', borderTop: '1px solid #374151', top: `${zeroLine}px` }} />
+                  <div style={{ position: 'absolute', fontSize: '10px', color: '#6b7280', top: `${zeroLine - 7}px`, left: '-18px' }}>$0</div>
+
+                  {renderBar(costStart, costEnd, '#f97316', `-$${Math.round(capitalCost)}`, 0, 'Capital')}
+                  {renderConnector(costEnd, 0)}
+
+                  {renderBar(fuelStart, fuelEnd, fuelSavings >= 0 ? '#60a5fa' : '#ef4444', 
+                    `${fuelSavings >= 0 ? '+' : ''}$${Math.round(fuelSavings)}`, 
+                    barWidth + gap, 'Fuel')}
+                  {renderConnector(fuelEnd, barWidth + gap)}
+
+                  {renderBar(timeStart, timeEnd, timeValue >= 0 ? '#22c55e' : '#ef4444', 
+                    `+$${Math.round(timeValue)}`, 
+                    (barWidth + gap) * 2, 'Time')}
+
+                  {renderBar(netStart, netEnd, netBenefit >= 0 ? '#16a34a' : '#dc2626', 
+                    `${netBenefit >= 0 ? '+' : ''}$${Math.round(netBenefit)}`, 
+                    (barWidth + gap) * 3, 'Net')}
                 </div>
               </div>
             );
           };
 
           const SliderControl = ({ label, value, onChange, min, max, step = 1, unit = "", helpText = "" }) => {
-            const sliderRef = React.useRef(null);
+            const sliderRef = useRef(null);
             
-            React.useEffect(() => {
+            useEffect(() => {
               if (sliderRef.current) {
                 updateSliderBackground(sliderRef.current);
               }
@@ -351,78 +444,319 @@
           };
 
           return (
-            <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '16px', background: 'white' }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>Clean cooking economic impact model</h1>
+            <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '16px', background: 'white' }}>
+              <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Clean cooking economic impact model</h1>
               
               <div style={{ padding: '12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', marginBottom: '16px', fontSize: '13px', color: '#331A38', lineHeight: '1.6' }}>
                 <p style={{ marginBottom: '8px' }}>
-                  <strong>This model evaluates the economic viability of clean cooking interventions for low-income households.</strong> Adjust parameters below to explore how baseline conditions, payment structures, and adoption patterns affect household-level returns.
+                  <strong>What this model does:</strong> Estimates the annual economic return of clean cooking technologies for low-income households. It compares fuel costs, time savings, and capital costs to calculate net benefit, ROI, and payback period.
                 </p>
                 <p>
-                  <strong>What you can adjust:</strong> Baseline fuel costs and time burdens reflect current household expenditures. The wage rate monetizes time saved from reduced fuel collection and cooking. Payment method determines capital cost structure. Stove stacking (continued use of traditional stoves alongside modern alternatives) reduces benefits proportionally.
+                  <strong>How to use it:</strong> Set baseline fuel costs and time burdens to reflect current household conditions. Choose a payment method and adjust financing terms. The "stove stacking" slider accounts for continued use of traditional stoves alongside modern alternatives. Affordability checks flag when payments exceed sustainable thresholds.
                 </p>
               </div>
 
+              {/* Technology Costs */}
               <div style={{ padding: '16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Input technology costs</h3>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Technology costs</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '12px' }}>
                   <div>
                     <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>Improved Cookstoves (ICS)</div>
-                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4' }}>{technologies.ics.description}</div>
+                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4', fontSize: '11px' }}>{technologies.ics.description}</div>
                     <SliderControl 
-                      label="Upfront capital cost" 
+                      label="Capital cost" 
                       value={icsCapitalBase} 
                       onChange={setIcsCapitalBase} 
-                      min={17.5} 
-                      max={32.5} 
-                      step={0.5} 
+                      min={15} 
+                      max={40} 
+                      step={1} 
                       unit=" USD"
+                      helpText="Lifespan: 5 years"
                     />
                   </div>
                   <div>
                     <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>LPG</div>
-                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4' }}>{technologies.lpg.description}</div>
+                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4', fontSize: '11px' }}>{technologies.lpg.description}</div>
                     <SliderControl 
-                      label="Upfront capital cost" 
+                      label="Capital cost" 
                       value={lpgCapitalBase} 
                       onChange={setLpgCapitalBase} 
-                      min={35} 
-                      max={65} 
+                      min={30} 
+                      max={80} 
                       step={1} 
                       unit=" USD"
+                      helpText="Lifespan: 10 years"
+                    />
+                    <SliderControl 
+                      label="Annual LPG fuel cost" 
+                      value={lpgAnnualFuelCost} 
+                      onChange={setLpgAnnualFuelCost} 
+                      min={40} 
+                      max={150} 
+                      step={5} 
+                      unit=" USD/yr"
+                      helpText="Varies by location: Kenya ~$70, Uganda ~$90"
                     />
                   </div>
                   <div>
                     <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>Solar E-Cooking</div>
-                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4' }}>{technologies.solar.description}</div>
+                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4', fontSize: '11px' }}>{technologies.solar.description}</div>
                     <SliderControl 
-                      label="Upfront capital cost" 
+                      label="Capital cost" 
                       value={solarCapitalBase} 
                       onChange={setSolarCapitalBase} 
-                      min={455} 
-                      max={845} 
-                      step={5} 
+                      min={400} 
+                      max={900} 
+                      step={10} 
                       unit=" USD"
+                      helpText="Lifespan: 7 years"
                     />
                   </div>
                 </div>
               </div>
 
+              {/* Payment Method and Financing */}
+              <div style={{ padding: '16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Payment method and financing</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                      <button 
+                        onClick={() => setPaymentMethod('upfront')} 
+                        style={{ 
+                          flex: 1,
+                          padding: '8px 12px',
+                          fontSize: '12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          border: '1px solid #331A38',
+                          background: paymentMethod === 'upfront' ? '#f97316' : 'white',
+                          color: paymentMethod === 'upfront' ? 'white' : '#374151'
+                        }}
+                      >
+                        Cash upfront
+                      </button>
+                      <button 
+                        onClick={() => setPaymentMethod('financing')} 
+                        style={{ 
+                          flex: 1,
+                          padding: '8px 12px',
+                          fontSize: '12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          border: '1px solid #331A38',
+                          background: paymentMethod === 'financing' ? '#f97316' : 'white',
+                          color: paymentMethod === 'financing' ? 'white' : '#374151'
+                        }}
+                      >
+                        Consumer loan
+                      </button>
+                      <button 
+                        onClick={() => setPaymentMethod('payg')} 
+                        style={{ 
+                          flex: 1,
+                          padding: '8px 12px',
+                          fontSize: '12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          border: '1px solid #331A38',
+                          background: paymentMethod === 'payg' ? '#f97316' : 'white',
+                          color: paymentMethod === 'payg' ? 'white' : '#374151'
+                        }}
+                      >
+                        PAYG (lease-to-own)
+                      </button>
+                    </div>
+
+                    {paymentMethod === 'financing' && (
+                      <div style={{ padding: '12px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb' }}>
+                        <SliderControl
+                          label="Deposit requirement"
+                          value={depositPercent}
+                          onChange={setDepositPercent}
+                          min={0}
+                          max={50}
+                          step={5}
+                          unit="%"
+                          helpText="Most MFIs require 10-30% upfront"
+                        />
+                        <SliderControl
+                          label="Loan term"
+                          value={loanTermYears}
+                          onChange={setLoanTermYears}
+                          min={0.5}
+                          max={3}
+                          step={0.5}
+                          unit=" years"
+                          helpText="Cookstove loans typically 1-2 years"
+                        />
+                        <SliderControl
+                          label="Annual interest rate (APR)"
+                          value={annualInterestRate}
+                          onChange={setAnnualInterestRate}
+                          min={15}
+                          max={50}
+                          step={1}
+                          unit="%"
+                          helpText="Rural MFI rates: 20-35% typical"
+                        />
+                      </div>
+                    )}
+
+                    {paymentMethod === 'payg' && (
+                      <div style={{ padding: '12px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb' }}>
+                        <SliderControl
+                          label="Lease-to-own term"
+                          value={paygTermYears}
+                          onChange={setPaygTermYears}
+                          min={1}
+                          max={4}
+                          step={0.5}
+                          unit=" years"
+                          helpText="Period until household owns asset"
+                        />
+                        <SliderControl
+                          label="Total premium over cash price"
+                          value={paygPremiumPercent}
+                          onChange={setPaygPremiumPercent}
+                          min={30}
+                          max={100}
+                          step={5}
+                          unit="%"
+                          helpText="PAYG cookstoves typically 50-80% premium"
+                        />
+                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '8px', fontStyle: 'italic' }}>
+                          No deposit required. Household owns asset after completing all payments.
+                        </div>
+                      </div>
+                    )}
+
+                    {paymentMethod === 'upfront' && (
+                      <div style={{ padding: '12px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb', fontSize: '12px', color: '#4b5563' }}>
+                        <p>Full cash payment upfront. Lowest total cost, but requires access to lump sum capital.</p>
+                        <p style={{ marginTop: '8px', fontWeight: '500' }}>Best ROI, but highest access barrier for low-income households.</p>
+                      </div>
+                    )}
+                    
+                    <div style={{ marginTop: '12px' }}>
+                      <SliderControl
+                        label="Monthly household income"
+                        value={monthlyHouseholdIncome}
+                        onChange={setMonthlyHouseholdIncome}
+                        min={30}
+                        max={300}
+                        step={5}
+                        unit=" USD"
+                        helpText="Used for affordability analysis"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Financing summary by technology</div>
+                    <div style={{ padding: '12px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb', fontSize: '12px' }}>
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontWeight: '600', color: '#331A38' }}>ICS</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Total cost:</span>
+                          <span style={{ fontWeight: '500' }}>${Math.round(icsTotalCapital)}</span>
+                        </div>
+                        {paymentMethod !== 'upfront' && (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Monthly payment:</span>
+                              <span style={{ fontWeight: '500' }}>${icsFinancing.monthlyPayment.toFixed(2)}</span>
+                            </div>
+                            {paymentMethod === 'financing' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Deposit:</span>
+                                <span style={{ fontWeight: '500' }}>${Math.round(icsFinancing.depositRequired)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      
+                      <div style={{ marginBottom: '12px', paddingTop: '8px', borderTop: '1px solid #e5e7eb' }}>
+                        <div style={{ fontWeight: '600', color: '#331A38' }}>LPG</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Total cost:</span>
+                          <span style={{ fontWeight: '500' }}>${Math.round(lpgTotalCapital)}</span>
+                        </div>
+                        {paymentMethod !== 'upfront' && (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Monthly payment:</span>
+                              <span style={{ fontWeight: '500' }}>${lpgFinancing.monthlyPayment.toFixed(2)}</span>
+                            </div>
+                            {paymentMethod === 'financing' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Deposit:</span>
+                                <span style={{ fontWeight: '500' }}>${Math.round(lpgFinancing.depositRequired)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      
+                      <div style={{ paddingTop: '8px', borderTop: '1px solid #e5e7eb' }}>
+                        <div style={{ fontWeight: '600', color: '#331A38' }}>Solar</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Total cost:</span>
+                          <span style={{ fontWeight: '500' }}>${Math.round(solarTotalCapital)}</span>
+                        </div>
+                        {paymentMethod !== 'upfront' && (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Monthly payment:</span>
+                              <span style={{ fontWeight: '500' }}>${solarFinancing.monthlyPayment.toFixed(2)}</span>
+                            </div>
+                            {paymentMethod === 'financing' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Deposit:</span>
+                                <span style={{ fontWeight: '500' }}>${Math.round(solarFinancing.depositRequired)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Affordability alerts */}
+                    {paymentMethod !== 'upfront' && allAffordabilityIssues.length > 0 && (
+                      <div style={{ marginTop: '12px' }}>
+                        {allAffordabilityIssues.map((issue, idx) => (
+                          <div key={idx} className={issue.severity === 'error' ? 'error-box' : 'warning-box'} style={{ marginBottom: '8px' }}>
+                            <strong>{issue.severity === 'error' ? '⛔' : '⚠️'}</strong> {issue.message}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {paymentMethod !== 'upfront' && allAffordabilityIssues.length === 0 && (
+                      <div className="success-box" style={{ marginTop: '12px' }}>
+                        <strong>✓ Affordability check passed:</strong> All monthly payments are within sustainable range relative to household income.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Baseline Context */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div style={{ padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Input baseline context</h3>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Baseline context</h3>
                   <SliderControl 
-                    label="Annual fuel cost" 
+                    label="Annual baseline fuel cost" 
                     value={baselineFuelCost} 
                     onChange={setBaselineFuelCost} 
                     min={0} 
                     max={300} 
                     step={5} 
                     unit=" USD/yr"
-                    helpText="Traditional fuels (wood, charcoal, dung) may be gathered at no cost, purchased, or a combination of both"
+                    helpText="Traditional fuels (wood, charcoal) may be gathered free, purchased, or both"
                   />
                   <SliderControl 
-                    label="Daily fuel collection" 
+                    label="Daily fuel collection time" 
                     value={baselineFuelCollection} 
                     onChange={setBaselineFuelCollection} 
                     min={0} 
@@ -441,6 +775,10 @@
                     unit=" hrs"
                     helpText="Includes meal prep and tending traditional stove"
                   />
+                </div>
+
+                <div style={{ padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Time value and adoption</h3>
                   <SliderControl 
                     label="Wage rate" 
                     value={wageRate} 
@@ -452,7 +790,7 @@
                     helpText="Based on local agricultural wage rates"
                   />
                   <SliderControl 
-                    label="Percent of time reallocated to paid work" 
+                    label="Time reallocated to paid work" 
                     value={timeReallocationPct} 
                     onChange={setTimeReallocationPct} 
                     min={0} 
@@ -461,117 +799,53 @@
                     unit="%"
                     helpText="Portion of time saved that generates income"
                   />
-                </div>
-
-                <div style={{ padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Input payment method</h3>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                    <button 
-                      onClick={() => setPaymentMethod('upfront')} 
-                      style={{ 
-                        flex: 1, 
-                        padding: '6px 12px', 
-                        fontSize: '12px', 
-                        borderRadius: '4px', 
-                        cursor: 'pointer', 
-                        border: '1px solid #331A38',
-                        background: paymentMethod === 'upfront' ? '#f97316' : 'white',
-                        color: paymentMethod === 'upfront' ? 'white' : '#374151'
-                      }}
-                    >
-                      Upfront
-                    </button>
-                    <button 
-                      onClick={() => setPaymentMethod('financing')} 
-                      style={{ 
-                        flex: 1, 
-                        padding: '6px 12px', 
-                        fontSize: '12px', 
-                        borderRadius: '4px', 
-                        cursor: 'pointer', 
-                        border: '1px solid #331A38',
-                        background: paymentMethod === 'financing' ? '#f97316' : 'white',
-                        color: paymentMethod === 'financing' ? 'white' : '#374151'
-                      }}
-                    >
-                      Financing
-                    </button>
-                    <button 
-                      onClick={() => setPaymentMethod('rental')} 
-                      style={{ 
-                        flex: 1, 
-                        padding: '6px 12px', 
-                        fontSize: '12px', 
-                        borderRadius: '4px', 
-                        cursor: 'pointer', 
-                        border: '1px solid #331A38',
-                        background: paymentMethod === 'rental' ? '#f97316' : 'white',
-                        color: paymentMethod === 'rental' ? 'white' : '#374151'
-                      }}
-                    >
-                      PAYG
-                    </button>
-                  </div>
-                  <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px', fontStyle: 'italic' }}>{getPaymentMethodDescription()}</p>
-                  <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}><strong>Lifespans:</strong> ICS: 5yr, LPG: 10yr, Solar: 7yr</p>
-                  
-                  <div style={{ fontSize: '12px', color: '#374151', marginBottom: '12px', padding: '8px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb' }}>
-                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>Total capital costs ({paymentMethod}):</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ICS:</span><span style={{ fontWeight: '500' }}>${Math.round(icsTotalCapital)}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>LPG:</span><span style={{ fontWeight: '500' }}>${Math.round(lpgTotalCapital)}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Solar:</span><span style={{ fontWeight: '500' }}>${Math.round(solarTotalCapital)}</span></div>
-                  </div>
-                  
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px', marginTop: '12px' }}>Stove stacking</h3>
-                  <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>Households often continue using traditional stoves alongside modern alternatives</p>
                   <SliderControl 
-                    label="Stacking level (% cook time using traditional stove)" 
+                    label="Stove stacking (traditional use)" 
                     value={stacking} 
                     onChange={setStacking} 
                     min={0} 
                     max={100} 
                     step={5} 
                     unit="%"
+                    helpText="Households often continue using traditional stoves alongside modern ones"
                   />
                 </div>
               </div>
 
+              {/* Time saved summary */}
               <div style={{ padding: '12px', background: '#eff6ff', borderLeft: '4px solid #331A38', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Total time saved by women (per year, full adoption, no stacking):</h3>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Time saved by women (per year, at current stacking level)</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '12px' }}>
                   <div>
-                    <div style={{ fontWeight: '500', marginBottom: '8px' }}>ICS: {Math.round((baselineFuelCollection * technologies.ics.fuelCollectionReduction + baselineCookingTime * technologies.ics.cookingTimeReduction) * 365)} hours/year</div>
-                    <div style={{ color: '#374151' }}>Fuel collection: -{(technologies.ics.fuelCollectionReduction * 100).toFixed(0)}% ({(baselineFuelCollection * technologies.ics.fuelCollectionReduction).toFixed(1)} hrs/day)</div>
-                    <div style={{ color: '#374151' }}>Cooking time: -{(technologies.ics.cookingTimeReduction * 100).toFixed(0)}% ({(baselineCookingTime * technologies.ics.cookingTimeReduction).toFixed(1)} hrs/day)</div>
+                    <div style={{ fontWeight: '500', marginBottom: '4px' }}>ICS: {Math.round(icsTotalHours)} hours/year</div>
+                    <div style={{ color: '#4b5563', fontSize: '11px' }}>Collection: -{(technologies.ics.fuelCollectionReduction * 100).toFixed(0)}% | Cooking: -{(technologies.ics.cookingTimeReduction * 100).toFixed(0)}%</div>
                   </div>
                   <div>
-                    <div style={{ fontWeight: '500', marginBottom: '8px' }}>LPG: {Math.round((baselineFuelCollection * technologies.lpg.fuelCollectionReduction + baselineCookingTime * technologies.lpg.cookingTimeReduction) * 365)} hours/year</div>
-                    <div style={{ color: '#374151' }}>Fuel collection: -{(technologies.lpg.fuelCollectionReduction * 100).toFixed(0)}% ({(baselineFuelCollection * technologies.lpg.fuelCollectionReduction).toFixed(1)} hrs/day)</div>
-                    <div style={{ color: '#374151' }}>Cooking time: -{(technologies.lpg.cookingTimeReduction * 100).toFixed(0)}% ({(baselineCookingTime * technologies.lpg.cookingTimeReduction).toFixed(1)} hrs/day)</div>
+                    <div style={{ fontWeight: '500', marginBottom: '4px' }}>LPG: {Math.round(lpgTotalHours)} hours/year</div>
+                    <div style={{ color: '#4b5563', fontSize: '11px' }}>Collection: -{(technologies.lpg.fuelCollectionReduction * 100).toFixed(0)}% | Cooking: -{(technologies.lpg.cookingTimeReduction * 100).toFixed(0)}%</div>
                   </div>
                   <div>
-                    <div style={{ fontWeight: '500', marginBottom: '8px' }}>Solar: {Math.round((baselineFuelCollection * technologies.solar.fuelCollectionReduction + baselineCookingTime * technologies.solar.cookingTimeReduction) * 365)} hours/year</div>
-                    <div style={{ color: '#374151' }}>Fuel collection: -{(technologies.solar.fuelCollectionReduction * 100).toFixed(0)}% ({(baselineFuelCollection * technologies.solar.fuelCollectionReduction).toFixed(1)} hrs/day)</div>
-                    <div style={{ color: '#374151' }}>Cooking time: -{(technologies.solar.cookingTimeReduction * 100).toFixed(0)}% ({(baselineCookingTime * technologies.solar.cookingTimeReduction).toFixed(1)} hrs/day)</div>
+                    <div style={{ fontWeight: '500', marginBottom: '4px' }}>Solar: {Math.round(solarTotalHours)} hours/year</div>
+                    <div style={{ color: '#4b5563', fontSize: '11px' }}>Collection: -{(technologies.solar.fuelCollectionReduction * 100).toFixed(0)}% | Cooking: -{(technologies.solar.cookingTimeReduction * 100).toFixed(0)}%</div>
                   </div>
                 </div>
               </div>
 
+              {/* Waterfall Charts */}
               <div style={{ marginBottom: '16px' }}>
                 <h2 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Annualized economic impact</h2>
                 <p style={{ fontSize: '13px', color: '#4b5563', marginBottom: '12px', lineHeight: '1.5' }}>
-                  Each bar shows the economic progression: starting below zero with annualized capital costs, then adding fuel savings (or, if applicable, subtracting newly incurred costs) and time value to reach net annual benefit. 
-                  Bars above the zero line represent positive returns; bars below indicate costs exceeding benefits. The final bar (green for positive, red for negative) shows if the solution delivers net annual economic value to households.
+                  Each chart shows annual capital costs offset by fuel savings and time value. Net benefit (green = positive, red = negative) indicates annual economic value to households.
                 </p>
                 
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginBottom: '12px', fontSize: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '12px', fontSize: '12px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ width: '12px', height: '12px', background: '#f97316' }}></div>
                     <span>Capital cost</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ width: '12px', height: '12px', background: '#60a5fa' }}></div>
-                    <span>Fuel savings/costs</span>
+                    <span>Fuel savings</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ width: '12px', height: '12px', background: '#22c55e' }}></div>
@@ -594,20 +868,21 @@
                 </div>
               </div>
 
+              {/* Economic Analysis Table */}
               <div style={{ padding: '16px', background: '#f9fafb', borderRadius: '6px', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Economic analysis:</h3>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Economic analysis summary</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '12px' }}>
                   <div style={{ padding: '12px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
                     <div style={{ fontWeight: '600', marginBottom: '8px' }}>{technologies.ics.name}</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Capital cost (annual):</span><span style={{ fontWeight: '500' }}>${Math.round(icsCapital)}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Fuel savings:</span><span style={{ fontWeight: '500', color: '#2563eb' }}>{icsFuelSavings >= 0 ? '+' : ''}${Math.round(icsFuelSavings)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Capital (annual):</span><span style={{ fontWeight: '500' }}>${Math.round(icsCapital)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Fuel savings:</span><span style={{ fontWeight: '500', color: icsFuelSavings >= 0 ? '#2563eb' : '#dc2626' }}>{icsFuelSavings >= 0 ? '+' : ''}${Math.round(icsFuelSavings)}</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Time value:</span><span style={{ fontWeight: '500', color: '#16a34a' }}>+${Math.round(icsTimeValue)}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total hours saved:</span><span style={{ fontWeight: '500', color: '#111827' }}>{Math.round(icsTotalHours)} hrs/yr</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Hours saved:</span><span style={{ fontWeight: '500' }}>{Math.round(icsTotalHours)} hrs/yr</span></div>
                       <div style={{ borderTop: '1px solid #d1d5db', paddingTop: '4px', marginTop: '4px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}><span>Net annual benefit:</span><span style={{ color: icsNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{icsNetBenefit >= 0 ? '+' : '-'}${Math.abs(Math.round(icsNetBenefit))}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: icsNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{icsROI >= 0 ? '+' : ''}{Math.round(icsROI)}%</span></div>
-                        {icsYearsToRepay && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback period:</span><span style={{ color: '#16a34a' }}>{icsYearsToRepay.toFixed(1)} yrs</span></div>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}><span>Net annual benefit:</span><span style={{ color: icsNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{icsNetBenefit >= 0 ? '+' : ''}${Math.round(icsNetBenefit)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: icsNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{Math.round(icsROI)}%</span></div>
+                        {icsYearsToRepay && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback:</span><span style={{ color: '#16a34a' }}>{icsYearsToRepay.toFixed(1)} yrs</span></div>}
                       </div>
                     </div>
                   </div>
@@ -615,14 +890,14 @@
                   <div style={{ padding: '12px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
                     <div style={{ fontWeight: '600', marginBottom: '8px' }}>{technologies.lpg.name}</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Capital cost (annual):</span><span style={{ fontWeight: '500' }}>${Math.round(lpgCapital)}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Fuel savings:</span><span style={{ fontWeight: '500', color: '#2563eb' }}>{lpgFuelSavings >= 0 ? '+' : '-'}${Math.round(Math.abs(lpgFuelSavings))}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Capital (annual):</span><span style={{ fontWeight: '500' }}>${Math.round(lpgCapital)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Fuel savings:</span><span style={{ fontWeight: '500', color: lpgFuelSavings >= 0 ? '#2563eb' : '#dc2626' }}>{lpgFuelSavings >= 0 ? '+' : ''}${Math.round(lpgFuelSavings)}</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Time value:</span><span style={{ fontWeight: '500', color: '#16a34a' }}>+${Math.round(lpgTimeValue)}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total hours saved:</span><span style={{ fontWeight: '500', color: '#111827' }}>{Math.round(lpgTotalHours)} hrs/yr</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Hours saved:</span><span style={{ fontWeight: '500' }}>{Math.round(lpgTotalHours)} hrs/yr</span></div>
                       <div style={{ borderTop: '1px solid #d1d5db', paddingTop: '4px', marginTop: '4px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}><span>Net annual benefit:</span><span style={{ color: lpgNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{lpgNetBenefit >= 0 ? '+' : '-'}${Math.abs(Math.round(lpgNetBenefit))}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: lpgNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{lpgROI >= 0 ? '+' : ''}{Math.round(lpgROI)}%</span></div>
-                        {lpgYearsToRepay && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback period:</span><span style={{ color: '#16a34a' }}>{lpgYearsToRepay.toFixed(1)} yrs</span></div>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}><span>Net annual benefit:</span><span style={{ color: lpgNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{lpgNetBenefit >= 0 ? '+' : ''}${Math.round(lpgNetBenefit)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: lpgNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{Math.round(lpgROI)}%</span></div>
+                        {lpgYearsToRepay && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback:</span><span style={{ color: '#16a34a' }}>{lpgYearsToRepay.toFixed(1)} yrs</span></div>}
                       </div>
                     </div>
                   </div>
@@ -630,54 +905,58 @@
                   <div style={{ padding: '12px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
                     <div style={{ fontWeight: '600', marginBottom: '8px' }}>{technologies.solar.name}</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Capital cost (annual):</span><span style={{ fontWeight: '500' }}>${Math.round(solarCapital)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Capital (annual):</span><span style={{ fontWeight: '500' }}>${Math.round(solarCapital)}</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Fuel savings:</span><span style={{ fontWeight: '500', color: '#2563eb' }}>+${Math.round(solarFuelSavings)}</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Time value:</span><span style={{ fontWeight: '500', color: '#16a34a' }}>+${Math.round(solarTimeValue)}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total hours saved:</span><span style={{ fontWeight: '500', color: '#111827' }}>{Math.round(solarTotalHours)} hrs/yr</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Hours saved:</span><span style={{ fontWeight: '500' }}>{Math.round(solarTotalHours)} hrs/yr</span></div>
                       <div style={{ borderTop: '1px solid #d1d5db', paddingTop: '4px', marginTop: '4px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}><span>Net annual benefit:</span><span style={{ color: solarNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{solarNetBenefit >= 0 ? '+' : '-'}${Math.abs(Math.round(solarNetBenefit))}</span></div>
-                        {solarYearsToRepay && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback period:</span><span style={{ color: '#16a34a' }}>{solarYearsToRepay.toFixed(1)} yrs</span></div>}
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: solarNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{solarROI >= 0 ? '+' : '-'}{Math.abs(Math.round(solarROI))}%</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}><span>Net annual benefit:</span><span style={{ color: solarNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{solarNetBenefit >= 0 ? '+' : ''}${Math.round(solarNetBenefit)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: solarNetBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{Math.round(solarROI)}%</span></div>
+                        {solarYearsToRepay && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback:</span><span style={{ color: '#16a34a' }}>{solarYearsToRepay.toFixed(1)} yrs</span></div>}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Summary boxes */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '12px' }}>
                 <div style={{ padding: '12px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '6px' }}>
                   <h3 style={{ fontWeight: '600', marginBottom: '8px' }}>Baseline conditions</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: '#374151' }}>
                     <div><strong>Primary fuel:</strong> Biomass (wood, charcoal), traditional 3-stone fire</div>
                     <div><strong>PM2.5 exposure:</strong> 695 μg/m³ (hazardous level, 139x WHO guidelines)</div>
-                    <div><strong>Daily time burden:</strong> {baselineFuelCollection.toFixed(1)} hrs fuel collection + {baselineCookingTime.toFixed(1)} hrs cooking</div>
-                    <div><strong>Annual fuel expenditure:</strong> ${baselineFuelCost} (mix of gathered and purchased)</div>
+                    <div><strong>Daily time burden:</strong> {baselineFuelCollection.toFixed(1)} hrs collection + {baselineCookingTime.toFixed(1)} hrs cooking</div>
+                    <div><strong>Annual fuel expenditure:</strong> ${baselineFuelCost}</div>
+                    <div><strong>Monthly household income:</strong> ${monthlyHouseholdIncome}</div>
                   </div>
                 </div>
 
                 <div style={{ padding: '12px', background: '#dcfce7', border: '1px solid #22c55e', borderRadius: '6px' }}>
-                  <h3 style={{ fontWeight: '600', marginBottom: '8px' }}>Intervention details (full adoption, no stacking)</h3>
+                  <h3 style={{ fontWeight: '600', marginBottom: '8px' }}>Health impact (full adoption, no stacking)</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', color: '#374151' }}>
                     <div>
                       <div style={{ fontWeight: '500' }}>ICS</div>
                       <div>PM2.5: -{(technologies.ics.pm25Reduction * 100).toFixed(0)}%</div>
                       <div>DALYs: {technologies.ics.dalys}/yr</div>
-                      <div style={{ fontSize: '11px', fontStyle: 'italic', marginTop: '4px' }}>{technologies.ics.evidenceStrength}</div>
                     </div>
                     <div>
                       <div style={{ fontWeight: '500' }}>LPG</div>
                       <div>PM2.5: -{(technologies.lpg.pm25Reduction * 100).toFixed(0)}%</div>
                       <div>DALYs: {technologies.lpg.dalys}/yr</div>
-                      <div style={{ fontSize: '11px', fontStyle: 'italic', marginTop: '4px' }}>{technologies.lpg.evidenceStrength}</div>
                     </div>
                     <div>
                       <div style={{ fontWeight: '500' }}>Solar</div>
                       <div>PM2.5: -{(technologies.solar.pm25Reduction * 100).toFixed(0)}%</div>
                       <div>DALYs: {technologies.solar.dalys}/yr</div>
-                      <div style={{ fontSize: '11px', fontStyle: 'italic', marginTop: '4px' }}>{technologies.solar.evidenceStrength}</div>
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Model notes */}
+              <div style={{ marginTop: '16px', padding: '12px', background: '#f3f4f6', borderRadius: '6px', fontSize: '11px', color: '#6b7280', lineHeight: '1.5' }}>
+                <strong>Model assumptions:</strong> Equipment lifespans are ICS: 5 years, LPG: 10 years, Solar: 7 years. Financing terms based on rural MFI and PAYG market data from East Africa. Time value only realized when time is reallocated to paid work. Stove stacking reduces all benefits proportionally. LPG economics depend heavily on local fuel prices and supply chain reliability.
               </div>
             </div>
           );

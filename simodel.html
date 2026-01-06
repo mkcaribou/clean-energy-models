@@ -10,14 +10,14 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; }
-input[type="range"] { 
-    width: 100%; 
-    height: 3px; 
-    background: #e5e7eb;  /* Will be overridden by JS */
-    border-radius: 3px; 
-    outline: none; 
-    -webkit-appearance: none; 
-}
+        input[type="range"] { 
+            width: 100%; 
+            height: 3px; 
+            background: #e5e7eb; 
+            border-radius: 3px; 
+            outline: none; 
+            -webkit-appearance: none; 
+        }
         input[type="range"]::-webkit-slider-thumb { 
             -webkit-appearance: none; 
             width: 15px; 
@@ -35,12 +35,15 @@ input[type="range"] {
             border-radius: 50%; 
             cursor: pointer; 
         }
+        .warning-box { padding: 12px; background: #fef3c7; border: 2px solid #f59e0b; border-radius: 6px; margin-bottom: 12px; font-size: 13px; line-height: 1.5; }
+        .error-box { padding: 12px; background: #fee2e2; border: 2px solid #dc2626; border-radius: 6px; margin-bottom: 12px; font-size: 13px; line-height: 1.5; }
+        .success-box { padding: 12px; background: #dcfce7; border: 2px solid #22c55e; border-radius: 6px; margin-bottom: 12px; font-size: 13px; line-height: 1.5; }
     </style>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState } = React;
+        const { useState, useEffect, useRef } = React;
         
         const updateSliderBackground = (slider) => {
           const min = parseFloat(slider.min);
@@ -55,13 +58,33 @@ input[type="range"] {
           const [plotSize, setPlotSize] = useState(0.4);
           const [baselineIrrigCost, setBaselineIrrigCost] = useState(25);
           const [cropValue, setCropValue] = useState(0.4);
-          const [paymentMethod, setPaymentMethod] = useState('upfront');
           const [additionalSeasonEnabled, setAdditionalSeasonEnabled] = useState(true);
           
-          // Capital costs per unit (not per ha)
+          // Payment method
+          const [paymentMethod, setPaymentMethod] = useState('upfront');
+          
+          // Financing parameters
+          const [depositPercent, setDepositPercent] = useState(20);
+          const [loanTermYears, setLoanTermYears] = useState(3);
+          const [annualInterestRate, setAnnualInterestRate] = useState(28);
+          
+          // PAYG parameters
+          const [paygTermYears, setPaygTermYears] = useState(3);
+          const [paygPremiumPercent, setPaygPremiumPercent] = useState(70);
+          
+          // Household income for affordability (monthly)
+          const [monthlyHouseholdIncome, setMonthlyHouseholdIncome] = useState(150);
+          
+          // Capital costs per unit
           const [smallPumpCost, setSmallPumpCost] = useState(500);
           const [mediumPumpCost, setMediumPumpCost] = useState(2438);
           const [dripSystemCost, setDripSystemCost] = useState(1063);
+          
+          // Maintenance costs (new)
+          const [annualMaintenanceCost, setAnnualMaintenanceCost] = useState(35);
+          
+          // Technology reliability (new)
+          const [technologyReliability, setTechnologyReliability] = useState(85);
           
           // Baseline contexts
           const contexts = {
@@ -130,10 +153,107 @@ input[type="range"] {
             }
           };
 
-          const getPaymentMethodDescription = () => {
-            if (paymentMethod === 'upfront') return 'Full payment upfront, amortized over equipment lifespan';
-            if (paymentMethod === 'financing') return 'Consumer financing adds 50% to total cost (interest + fees)';
-            return 'PAYG/rental model adds 30% annual premium for service + maintenance';
+          // Calculate financing details
+          const calculateFinancingDetails = (baseCost) => {
+            if (paymentMethod === 'upfront') {
+              return {
+                totalCost: baseCost,
+                depositRequired: baseCost,
+                monthlyPayment: 0,
+                totalInterest: 0,
+                description: 'Full payment upfront'
+              };
+            }
+            
+            if (paymentMethod === 'financing') {
+              const deposit = baseCost * (depositPercent / 100);
+              const principal = baseCost - deposit;
+              const monthlyRate = annualInterestRate / 100 / 12;
+              const numPayments = loanTermYears * 12;
+              
+              let monthlyPayment = 0;
+              if (monthlyRate > 0 && numPayments > 0) {
+                monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
+              } else {
+                monthlyPayment = principal / numPayments;
+              }
+              
+              const totalPaid = deposit + (monthlyPayment * numPayments);
+              const totalInterest = totalPaid - baseCost;
+              
+              return {
+                totalCost: totalPaid,
+                depositRequired: deposit,
+                monthlyPayment: monthlyPayment,
+                totalInterest: totalInterest,
+                description: `${depositPercent}% deposit + ${loanTermYears}-year loan at ${annualInterestRate}% APR`
+              };
+            }
+            
+            // PAYG (lease-to-own)
+            const totalCost = baseCost * (1 + paygPremiumPercent / 100);
+            const monthlyPayment = totalCost / (paygTermYears * 12);
+            return {
+              totalCost: totalCost,
+              depositRequired: 0,
+              monthlyPayment: monthlyPayment,
+              totalInterest: totalCost - baseCost,
+              description: `Lease-to-own over ${paygTermYears} years, ${paygPremiumPercent}% total premium`
+            };
+          };
+
+          // Affordability check
+          const checkAffordability = (monthlyPayment, depositRequired, techName, totalCapital) => {
+            const issues = [];
+            
+            if (paymentMethod === 'upfront') {
+              // For upfront, check if total cost is affordable relative to income
+              const monthsOfIncome = totalCapital / monthlyHouseholdIncome;
+              if (monthsOfIncome > 6) {
+                issues.push({ 
+                  severity: 'error', 
+                  message: `${techName}: Upfront cost ($${Math.round(totalCapital)}) exceeds 6 months income. Major access barrier without financing.` 
+                });
+              } else if (monthsOfIncome > 3) {
+                issues.push({ 
+                  severity: 'warning', 
+                  message: `${techName}: Upfront cost ($${Math.round(totalCapital)}) exceeds 3 months income. May require savings program.` 
+                });
+              }
+            } else {
+              // For financing/PAYG, check monthly payments
+              const paymentToIncomeRatio = (monthlyPayment / monthlyHouseholdIncome) * 100;
+              
+              if (paymentToIncomeRatio > 20) {
+                issues.push({ 
+                  severity: 'error', 
+                  message: `${techName}: Monthly payment (${paymentToIncomeRatio.toFixed(0)}% of income) exceeds safe threshold of 20%. High default risk.` 
+                });
+              } else if (paymentToIncomeRatio > 12) {
+                issues.push({ 
+                  severity: 'warning', 
+                  message: `${techName}: Monthly payment (${paymentToIncomeRatio.toFixed(0)}% of income) is moderately high.` 
+                });
+              }
+              
+              // Check deposit for financing
+              if (paymentMethod === 'financing' && depositRequired > 0) {
+                const depositMonths = depositRequired / monthlyHouseholdIncome;
+                if (depositMonths > 3) {
+                  issues.push({ 
+                    severity: 'error', 
+                    message: `${techName}: Deposit ($${Math.round(depositRequired)}) exceeds 3 months income. Major access barrier.` 
+                  });
+                } else if (depositMonths > 1.5) {
+                  issues.push({ 
+                    severity: 'warning', 
+                    message: `${techName}: Deposit ($${Math.round(depositRequired)}) exceeds 1.5 months income. May require savings program.` 
+                  });
+                }
+              }
+            }
+            
+            return { issues };
           };
 
           const calculatePumpsNeeded = (pumpType) => {
@@ -153,22 +273,29 @@ input[type="range"] {
             const pumpsNeeded = calculatePumpsNeeded(pumpType);
             
             // Capital cost - total for all pumps needed
-            const totalCapital = pump.unitCost * pumpsNeeded;
-            const capitalMultiplier = paymentMethod === 'upfront' ? 1 : (paymentMethod === 'financing' ? 1.5 : 1.3);
-            const totalCapitalCost = totalCapital * capitalMultiplier;
+            const totalCapitalBase = pump.unitCost * pumpsNeeded;
+            const financing = calculateFinancingDetails(totalCapitalBase);
+            const totalCapitalCost = financing.totalCost;
             const annualCapitalCost = totalCapitalCost / pump.lifespan;
             
-            // Seasons with intervention
+            // Maintenance (scales with number of pumps)
+            const totalMaintenance = annualMaintenanceCost * pumpsNeeded;
+            
+            // Technology reliability factor
+            const reliabilityFactor = technologyReliability / 100;
+            
+            // Seasons with intervention (adjusted for reliability)
             const effectiveSeasons = additionalSeasonEnabled ? 
-              Math.min(baseline.baseSeasons + (pump.maxSeasons - baseline.baseSeasons), pump.maxSeasons) : 
+              Math.min(baseline.baseSeasons + (pump.maxSeasons - baseline.baseSeasons) * reliabilityFactor, pump.maxSeasons) : 
               baseline.baseSeasons;
             
             const seasonsAdded = effectiveSeasons - baseline.baseSeasons;
             
-            // Income increase breakdown
-            const yieldImprovementIncome = plotSize * baseline.baseYield * pump.yieldIncrease * cropValue * baseline.baseSeasons;
+            // Income increase breakdown (adjusted for reliability)
+            const effectiveYieldIncrease = pump.yieldIncrease * reliabilityFactor;
+            const yieldImprovementIncome = plotSize * baseline.baseYield * effectiveYieldIncrease * cropValue * baseline.baseSeasons;
             const additionalSeasonIncome = seasonsAdded > 0 ? 
-              plotSize * baseline.baseYield * (1 + pump.yieldIncrease) * cropValue * seasonsAdded : 0;
+              plotSize * baseline.baseYield * (1 + effectiveYieldIncrease) * cropValue * seasonsAdded : 0;
             
             const incomeIncrease = yieldImprovementIncome + additionalSeasonIncome;
             
@@ -176,207 +303,218 @@ input[type="range"] {
             const scalingFactor = plotSize / baseline.refPlotSize;
             const costSavings = baselineIrrigCost * scalingFactor;
             
-            // Net benefit (no time savings)
+            // Total costs and benefits
+            const totalCosts = annualCapitalCost + totalMaintenance;
             const totalBenefit = incomeIncrease + costSavings;
-            const netBenefit = totalBenefit - annualCapitalCost;
+            const netBenefit = totalBenefit - totalCosts;
             
             // ROI and payback
-            const roi = annualCapitalCost > 0 ? (netBenefit / annualCapitalCost) * 100 : 0;
-            const paybackYears = netBenefit > 0 ? totalCapital / netBenefit : null;
+            const roi = totalCosts > 0 ? (netBenefit / totalCosts) * 100 : 0;
+            const paybackYears = netBenefit > 0 ? totalCapitalBase / netBenefit : null;
+            
+            // Affordability
+            const affordability = checkAffordability(financing.monthlyPayment, financing.depositRequired, pump.name, totalCapitalBase);
             
             return {
-              totalCapital,
+              totalCapitalBase,
               totalCapitalCost,
               annualCapitalCost,
+              totalMaintenance,
               incomeIncrease,
               yieldImprovementIncome,
               additionalSeasonIncome,
               costSavings,
+              totalCosts,
               netBenefit,
               roi,
               paybackYears,
               pumpsNeeded,
               effectiveSeasons,
-              seasonsAdded
+              seasonsAdded,
+              financing,
+              affordability,
+              effectiveYieldIncrease: effectiveYieldIncrease * 100
             };
           };
 
           const smallMetrics = calculateMetrics('small');
           const mediumMetrics = calculateMetrics('medium');
           const dripMetrics = calculateMetrics('drip');
-
-          const allValues = [
-            smallMetrics.annualCapitalCost, smallMetrics.incomeIncrease, smallMetrics.costSavings, Math.abs(smallMetrics.netBenefit),
-            mediumMetrics.annualCapitalCost, mediumMetrics.incomeIncrease, mediumMetrics.costSavings, Math.abs(mediumMetrics.netBenefit),
-            dripMetrics.annualCapitalCost, dripMetrics.incomeIncrease, dripMetrics.costSavings, Math.abs(dripMetrics.netBenefit)
+          
+          const allAffordabilityIssues = [
+            ...smallMetrics.affordability.issues,
+            ...mediumMetrics.affordability.issues,
+            ...dripMetrics.affordability.issues
           ];
-          const maxValue = Math.max(...allValues) * 1.2;
-          const scale = 120 / maxValue;
 
-          const WaterfallChart = ({ incomeIncrease, costSavings, capitalCost, netBenefit, label, pumpsNeeded }) => {
-            const zero = 120;
-            const step1 = zero + (capitalCost * scale);
-            const step2 = step1 - (incomeIncrease * scale);
-            const step3 = step2 - (costSavings * scale);
+          // Fixed Waterfall Chart with proper cumulative positioning
+          const WaterfallChart = ({ incomeIncrease, costSavings, totalCosts, netBenefit, label, pumpsNeeded }) => {
+            const values = [totalCosts, incomeIncrease, costSavings, netBenefit];
+            const absValues = values.map(v => Math.abs(v));
+            const maxAbsValue = Math.max(...absValues, 1) * 1.3;
             
-            const barWidth = 45;
+            const chartHeight = 160;
+            const zeroLine = chartHeight / 2;
+            const scale = (chartHeight / 2) / maxAbsValue;
+
+            // Calculate cumulative positions for waterfall
+            let runningTotal = 0;
+            
+            const costStart = runningTotal;
+            runningTotal -= totalCosts;
+            const costEnd = runningTotal;
+            
+            const incomeStart = runningTotal;
+            runningTotal += incomeIncrease;
+            const incomeEnd = runningTotal;
+            
+            const savingsStart = runningTotal;
+            runningTotal += costSavings;
+            const savingsEnd = runningTotal;
+            
+            const netStart = 0;
+            const netEnd = netBenefit;
+
+            const barWidth = 42;
             const gap = 10;
             const totalWidth = (barWidth * 4) + (gap * 3);
+
+            const valueToY = (val) => zeroLine - (val * scale);
+
+            const renderBar = (startVal, endVal, color, labelText, xPos, barLabel) => {
+              const y1 = valueToY(startVal);
+              const y2 = valueToY(endVal);
+              const top = Math.min(y1, y2);
+              const height = Math.max(Math.abs(y2 - y1), 2);
+              const change = endVal - startVal;
+              const isPositive = change >= 0;
+              
+              return (
+                <div style={{ position: 'absolute', left: `${xPos}px` }}>
+                  <div style={{ 
+                    width: `${barWidth}px`,
+                    height: `${height}px`,
+                    position: 'absolute',
+                    top: `${top}px`,
+                    background: color
+                  }}>
+                    <div style={{ 
+                      color: height > 18 ? 'white' : color,
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      textAlign: 'center',
+                      position: height > 18 ? 'relative' : 'absolute',
+                      top: height > 18 ? '3px' : (isPositive ? '-14px' : `${height + 2}px`),
+                      width: '100%',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {labelText}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '10px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: `${chartHeight + 6}px`, lineHeight: '1.2', fontWeight: '500' }}>
+                    {barLabel}
+                  </div>
+                </div>
+              );
+            };
+
+            const renderConnector = (fromVal, xPos) => {
+              const y = valueToY(fromVal);
+              return (
+                <div style={{ 
+                  position: 'absolute', 
+                  left: `${xPos + barWidth}px`, 
+                  top: `${y}px`, 
+                  width: `${gap}px`, 
+                  borderTop: '1px dashed #9ca3af' 
+                }} />
+              );
+            };
             
             return (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '4px' }}>{label}</div>
                 <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px' }}>
-                  ({pumpsNeeded} {pumpsNeeded === 1 ? 'pump' : 'pumps'} needed)
+                  ({pumpsNeeded} {pumpsNeeded === 1 ? 'unit' : 'units'} needed)
                 </div>
-                <div style={{ position: 'relative', width: `${totalWidth}px`, height: '250px' }}>
-                  <div style={{ position: 'absolute', width: '100%', borderTop: '1px solid #9ca3af', top: `${zero}px` }} />
-                  <div style={{ position: 'absolute', fontSize: '12px', color: '#6b7280', top: `${zero - 12}px`, left: '-25px' }}>$0</div>
-                  
-                  {/* Capital cost */}
-                  <div style={{ position: 'absolute', left: '0px' }}>
-                    <div style={{ width: `${barWidth}px`, height: `${Math.abs(capitalCost * scale)}px`, position: 'absolute', top: `${zero}px`, background: '#f97316' }}>
-                      <div style={{ 
-                        color: Math.abs(capitalCost * scale) > 20 ? 'white' : '#FF5533', 
-                        fontSize: '10px', 
-                        fontWeight: '600',
-                        textAlign: 'center', 
-                        position: Math.abs(capitalCost * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(capitalCost * scale) > 20 ? '4px' : '-16px',
-                        width: '100%'
-                      }}>
-                        -${Math.round(capitalCost)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '10px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: '230px' }}>
-                      Capital<br/>cost
-                    </div>
-                    <div style={{ position: 'absolute', width: `${gap}px`, left: `${barWidth}px`, top: `${step1}px`, borderTop: '1px dashed #d1d5db' }} />
-                  </div>
-                  
-                  {/* Income increase */}
-                  <div style={{ position: 'absolute', left: `${barWidth + gap}px` }}>
-                    <div style={{ width: `${barWidth}px`, height: `${Math.abs(incomeIncrease * scale)}px`, position: 'absolute', top: `${step2}px`, background: '#22c55e' }}>
-                      <div style={{ 
-                        color: Math.abs(incomeIncrease * scale) > 20 ? 'white' : '#16a34a', 
-                        fontSize: '10px', 
-                        fontWeight: '600',
-                        textAlign: 'center', 
-                        position: Math.abs(incomeIncrease * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(incomeIncrease * scale) > 20 ? '4px' : '-16px',
-                        width: '100%'
-                      }}>
-                        +${Math.round(incomeIncrease)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '10px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: '230px' }}>
-                      Income<br/>increase
-                    </div>
-                    <div style={{ position: 'absolute', width: `${gap}px`, left: `${barWidth}px`, top: `${step2}px`, borderTop: '1px dashed #d1d5db' }} />
-                  </div>
-                  
-                  {/* Cost savings */}
-                  <div style={{ position: 'absolute', left: `${(barWidth + gap) * 2}px` }}>
-                    <div style={{ width: `${barWidth}px`, height: `${Math.abs(costSavings * scale)}px`, position: 'absolute', top: `${step3}px`, background: '#a78bfa' }}>
-                      <div style={{ 
-                        color: Math.abs(costSavings * scale) > 20 ? 'white' : '#7c3aed', 
-                        fontSize: '10px', 
-                        fontWeight: '600',
-                        textAlign: 'center', 
-                        position: Math.abs(costSavings * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(costSavings * scale) > 20 ? '4px' : '-16px',
-                        width: '100%'
-                      }}>
-                        +${Math.round(costSavings)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '10px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: '230px' }}>
-                      Cost<br/>savings
-                    </div>
-                    <div style={{ position: 'absolute', width: `${gap}px`, left: `${barWidth}px`, top: `${step3}px`, borderTop: '1px dashed #d1d5db' }} />
-                  </div>
-                  
-                  {/* Net benefit */}
-                  <div style={{ position: 'absolute', left: `${(barWidth + gap) * 3}px` }}>
-                    <div style={{ width: `${barWidth}px`, height: `${Math.abs(netBenefit * scale)}px`, position: 'absolute', top: `${netBenefit >= 0 ? step3 : zero}px`, background: netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>
-                      <div style={{ 
-                        color: Math.abs(netBenefit * scale) > 20 ? 'white' : (netBenefit >= 0 ? '#16a34a' : '#dc2626'), 
-                        fontSize: '10px', 
-                        fontWeight: '600',
-                        textAlign: 'center', 
-                        position: Math.abs(netBenefit * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(netBenefit * scale) > 20 ? '4px' : (netBenefit >= 0 ? '-16px' : `${Math.abs(netBenefit * scale) + 4}px`),
-                        width: '100%'
-                      }}>
-                        {netBenefit >= 0 ? '+' : ''}${Math.round(netBenefit)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '10px', textAlign: 'center', fontWeight: '600', width: `${barWidth}px`, position: 'absolute', top: '230px' }}>
-                      Net<br/>benefit
-                    </div>
-                  </div>
+                <div style={{ position: 'relative', width: `${totalWidth}px`, height: `${chartHeight + 35}px` }}>
+                  <div style={{ position: 'absolute', width: '100%', borderTop: '1px solid #374151', top: `${zeroLine}px` }} />
+                  <div style={{ position: 'absolute', fontSize: '10px', color: '#6b7280', top: `${zeroLine - 7}px`, left: '-18px' }}>$0</div>
+
+                  {renderBar(costStart, costEnd, '#f97316', `-$${Math.round(totalCosts)}`, 0, 'Annual\ncosts')}
+                  {renderConnector(costEnd, 0)}
+
+                  {renderBar(incomeStart, incomeEnd, '#22c55e', `+$${Math.round(incomeIncrease)}`, barWidth + gap, 'Income\nincrease')}
+                  {renderConnector(incomeEnd, barWidth + gap)}
+
+                  {renderBar(savingsStart, savingsEnd, '#a78bfa', `+$${Math.round(costSavings)}`, (barWidth + gap) * 2, 'Cost\nsavings')}
+
+                  {renderBar(netStart, netEnd, netBenefit >= 0 ? '#16a34a' : '#dc2626', 
+                    `${netBenefit >= 0 ? '+' : ''}$${Math.round(netBenefit)}`, 
+                    (barWidth + gap) * 3, 'Net\nbenefit')}
                 </div>
               </div>
             );
           };
 
- const SliderControl = ({ label, value, onChange, min, max, step = 1, unit = "", helpText = "" }) => {
-  const sliderRef = React.useRef(null);
-  
-  React.useEffect(() => {
-    if (sliderRef.current) {
-      updateSliderBackground(sliderRef.current);
-    }
-  }, [value]);
-  
-  return (
-    <div style={{ marginBottom: '8px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-        <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151' }}>{label}</label>
-        <span style={{ fontSize: '12px', fontWeight: '600', color: '#111827' }}>{value}{unit}</span>
-      </div>
-      {helpText && <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px', fontStyle: 'italic' }}>{helpText}</div>}
-      <input 
-        ref={sliderRef}
-        type="range" 
-        min={min} 
-        max={max} 
-        step={step} 
-        value={value} 
-        onChange={(e) => {
-          onChange(parseFloat(e.target.value));
-          updateSliderBackground(e.target);
-        }} 
-      />
-    </div>
-  );
-};
+          const SliderControl = ({ label, value, onChange, min, max, step = 1, unit = "", helpText = "" }) => {
+            const sliderRef = useRef(null);
+            
+            useEffect(() => {
+              if (sliderRef.current) {
+                updateSliderBackground(sliderRef.current);
+              }
+            }, [value]);
+            
+            return (
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151' }}>{label}</label>
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: '#111827' }}>{value}{unit}</span>
+                </div>
+                {helpText && <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px', fontStyle: 'italic' }}>{helpText}</div>}
+                <input 
+                  ref={sliderRef}
+                  type="range" 
+                  min={min} 
+                  max={max} 
+                  step={step} 
+                  value={value} 
+                  onChange={(e) => {
+                    onChange(parseFloat(e.target.value));
+                    updateSliderBackground(e.target);
+                  }} 
+                />
+              </div>
+            );
+          };
 
           return (
-            <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '16px', background: 'white' }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>Solar irrigation economic impact model</h1>
+            <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '16px', background: 'white' }}>
+              <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Solar irrigation economic impact model</h1>
               
               <div style={{ padding: '12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', marginBottom: '16px', fontSize: '13px', color: '#331A38', lineHeight: '1.6' }}>
                 <p style={{ marginBottom: '8px' }}>
-                  <strong>This model evaluates the economic viability of solar irrigation for smallholder farmers in Kenya.</strong> Returns come primarily from increased crop yields and additional growing seasons, with secondary benefits from reduced irrigation costs.
+                  <strong>What this model does:</strong> Estimates the annual economic return of solar irrigation systems for smallholder farmers. Returns come primarily from increased crop yields and additional growing seasons, with secondary benefits from reduced irrigation costs.
                 </p>
                 <p>
-                  <strong>What you can adjust:</strong> Select baseline irrigation context to set reference conditions (yield, seasons, labor hours). Adjust plot size, crop value, and irrigation costs to match your context. Toggle additional growing seasons and payment method to see household returns.
+                  <strong>How to use it:</strong> Select baseline irrigation context to set reference conditions. Adjust plot size and crop value to match your context. Choose a payment method and adjust financing terms. The technology reliability slider accounts for cloudy days, maintenance downtime, and water source limitations. Affordability checks flag when payments exceed sustainable thresholds.
                 </p>
               </div>
 
+              {/* Technology Costs */}
               <div style={{ padding: '16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Technology specifications & capital costs</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '12px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Technology specifications and costs</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px', fontSize: '12px' }}>
                   <div>
                     <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>{pumps.small.name}</div>
-                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4' }}>{pumps.small.description}</div>
+                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4', fontSize: '11px' }}>{pumps.small.description}</div>
                     <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
-                      <div>Coverage: {pumps.small.coveragePerPump} ha per pump</div>
+                      <div>Coverage: {pumps.small.coveragePerPump} ha/pump</div>
                       <div>Yield increase: +{(pumps.small.yieldIncrease * 100).toFixed(0)}%</div>
                     </div>
                     <SliderControl 
-                      label="Capital cost per unit" 
+                      label="Capital cost" 
                       value={smallPumpCost} 
                       onChange={setSmallPumpCost} 
                       min={350} 
@@ -384,53 +522,297 @@ input[type="range"] {
                       step={25} 
                       unit=" USD"
                     />
-                    <div style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic', marginTop: '4px' }}>
-                      = ${Math.round(smallPumpCost / pumps.small.coveragePerPump)}/ha
-                    </div>
                   </div>
                   <div>
                     <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>{pumps.medium.name}</div>
-                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4' }}>{pumps.medium.description}</div>
+                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4', fontSize: '11px' }}>{pumps.medium.description}</div>
                     <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
-                      <div>Coverage: {pumps.medium.coveragePerPump} ha per pump</div>
+                      <div>Coverage: {pumps.medium.coveragePerPump} ha/pump</div>
                       <div>Yield increase: +{(pumps.medium.yieldIncrease * 100).toFixed(0)}%</div>
                     </div>
                     <SliderControl 
-                      label="Capital cost per unit" 
+                      label="Capital cost" 
                       value={mediumPumpCost} 
                       onChange={setMediumPumpCost} 
-                      min={1710} 
-                      max={3165} 
-                      step={25} 
+                      min={1700} 
+                      max={3200} 
+                      step={50} 
                       unit=" USD"
                     />
-                    <div style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic', marginTop: '4px' }}>
-                      = ${Math.round(mediumPumpCost / pumps.medium.coveragePerPump)}/ha
-                    </div>
                   </div>
                   <div>
                     <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>{pumps.drip.name}</div>
-                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4' }}>{pumps.drip.description}</div>
+                    <div style={{ color: '#4b5563', marginBottom: '8px', lineHeight: '1.4', fontSize: '11px' }}>{pumps.drip.description}</div>
                     <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
-                      <div>Coverage: {pumps.drip.coveragePerPump} ha per pump</div>
+                      <div>Coverage: {pumps.drip.coveragePerPump} ha/system</div>
                       <div>Yield increase: +{(pumps.drip.yieldIncrease * 100).toFixed(0)}%</div>
                     </div>
                     <SliderControl 
-                      label="Capital cost per unit" 
+                      label="Capital cost" 
                       value={dripSystemCost} 
                       onChange={setDripSystemCost} 
-                      min={745} 
-                      max={1380} 
+                      min={750} 
+                      max={1400} 
                       step={25} 
                       unit=" USD"
                     />
-                    <div style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic', marginTop: '4px' }}>
-                      = ${Math.round(dripSystemCost / pumps.drip.coveragePerPump)}/ha
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>Operating parameters</div>
+                    <SliderControl 
+                      label="Annual maintenance" 
+                      value={annualMaintenanceCost} 
+                      onChange={setAnnualMaintenanceCost} 
+                      min={0} 
+                      max={100} 
+                      step={5} 
+                      unit=" USD/unit"
+                      helpText="Panel cleaning, pump service, drip flushing"
+                    />
+                    <SliderControl 
+                      label="Technology reliability" 
+                      value={technologyReliability} 
+                      onChange={setTechnologyReliability} 
+                      min={60} 
+                      max={100} 
+                      step={5} 
+                      unit="%"
+                      helpText="Accounts for cloudy days, downtime, water limits"
+                    />
+                    <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                      <strong>Lifespan:</strong> All systems 7 years
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Payment Method and Financing */}
+              <div style={{ padding: '16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Payment method and financing</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                      <button 
+                        onClick={() => setPaymentMethod('upfront')} 
+                        style={{ 
+                          flex: 1,
+                          padding: '8px 12px',
+                          fontSize: '12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          border: '1px solid #331A38',
+                          background: paymentMethod === 'upfront' ? '#f97316' : 'white',
+                          color: paymentMethod === 'upfront' ? 'white' : '#374151'
+                        }}
+                      >
+                        Cash upfront
+                      </button>
+                      <button 
+                        onClick={() => setPaymentMethod('financing')} 
+                        style={{ 
+                          flex: 1,
+                          padding: '8px 12px',
+                          fontSize: '12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          border: '1px solid #331A38',
+                          background: paymentMethod === 'financing' ? '#f97316' : 'white',
+                          color: paymentMethod === 'financing' ? 'white' : '#374151'
+                        }}
+                      >
+                        Consumer loan
+                      </button>
+                      <button 
+                        onClick={() => setPaymentMethod('payg')} 
+                        style={{ 
+                          flex: 1,
+                          padding: '8px 12px',
+                          fontSize: '12px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          border: '1px solid #331A38',
+                          background: paymentMethod === 'payg' ? '#f97316' : 'white',
+                          color: paymentMethod === 'payg' ? 'white' : '#374151'
+                        }}
+                      >
+                        PAYG (lease-to-own)
+                      </button>
+                    </div>
+
+                    {paymentMethod === 'financing' && (
+                      <div style={{ padding: '12px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb' }}>
+                        <SliderControl
+                          label="Deposit requirement"
+                          value={depositPercent}
+                          onChange={setDepositPercent}
+                          min={0}
+                          max={50}
+                          step={5}
+                          unit="%"
+                          helpText="Most agricultural lenders require 15-30% upfront"
+                        />
+                        <SliderControl
+                          label="Loan term"
+                          value={loanTermYears}
+                          onChange={setLoanTermYears}
+                          min={1}
+                          max={5}
+                          step={0.5}
+                          unit=" years"
+                          helpText="Asset-backed loans typically 2-4 years"
+                        />
+                        <SliderControl
+                          label="Annual interest rate (APR)"
+                          value={annualInterestRate}
+                          onChange={setAnnualInterestRate}
+                          min={15}
+                          max={45}
+                          step={1}
+                          unit="%"
+                          helpText="Agricultural finance: 20-35% typical"
+                        />
+                      </div>
+                    )}
+
+                    {paymentMethod === 'payg' && (
+                      <div style={{ padding: '12px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb' }}>
+                        <SliderControl
+                          label="Lease-to-own term"
+                          value={paygTermYears}
+                          onChange={setPaygTermYears}
+                          min={2}
+                          max={5}
+                          step={0.5}
+                          unit=" years"
+                          helpText="Period until farmer owns asset"
+                        />
+                        <SliderControl
+                          label="Total premium over cash price"
+                          value={paygPremiumPercent}
+                          onChange={setPaygPremiumPercent}
+                          min={40}
+                          max={100}
+                          step={5}
+                          unit="%"
+                          helpText="PAYG solar typically 50-80% premium"
+                        />
+                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '8px', fontStyle: 'italic' }}>
+                          No deposit required. Farmer owns asset after completing all payments.
+                        </div>
+                      </div>
+                    )}
+
+                    {paymentMethod === 'upfront' && (
+                      <div style={{ padding: '12px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb', fontSize: '12px', color: '#4b5563' }}>
+                        <p>Full cash payment upfront. Lowest total cost, but requires access to lump sum capital.</p>
+                        <p style={{ marginTop: '8px', fontWeight: '500' }}>Best ROI, but highest access barrier for smallholders.</p>
+                      </div>
+                    )}
+                    
+                    <div style={{ marginTop: '12px' }}>
+                      <SliderControl
+                        label="Monthly household income"
+                        value={monthlyHouseholdIncome}
+                        onChange={setMonthlyHouseholdIncome}
+                        min={80}
+                        max={500}
+                        step={10}
+                        unit=" USD/mo"
+                        helpText="Used for affordability analysis"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Financing summary by technology</div>
+                    <div style={{ padding: '12px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb', fontSize: '12px' }}>
+                      <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontWeight: '600', color: '#331A38' }}>200W Pump ({smallMetrics.pumpsNeeded} unit{smallMetrics.pumpsNeeded > 1 ? 's' : ''})</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Total cost:</span>
+                          <span style={{ fontWeight: '500' }}>${Math.round(smallMetrics.totalCapitalCost)}</span>
+                        </div>
+                        {paymentMethod !== 'upfront' && (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Monthly payment:</span>
+                              <span style={{ fontWeight: '500' }}>${smallMetrics.financing.monthlyPayment.toFixed(2)}</span>
+                            </div>
+                            {paymentMethod === 'financing' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Deposit:</span>
+                                <span style={{ fontWeight: '500' }}>${Math.round(smallMetrics.financing.depositRequired)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      
+                      <div style={{ marginBottom: '12px', paddingTop: '8px', borderTop: '1px solid #e5e7eb' }}>
+                        <div style={{ fontWeight: '600', color: '#331A38' }}>400W Pump ({mediumMetrics.pumpsNeeded} unit{mediumMetrics.pumpsNeeded > 1 ? 's' : ''})</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Total cost:</span>
+                          <span style={{ fontWeight: '500' }}>${Math.round(mediumMetrics.totalCapitalCost)}</span>
+                        </div>
+                        {paymentMethod !== 'upfront' && (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Monthly payment:</span>
+                              <span style={{ fontWeight: '500' }}>${mediumMetrics.financing.monthlyPayment.toFixed(2)}</span>
+                            </div>
+                            {paymentMethod === 'financing' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Deposit:</span>
+                                <span style={{ fontWeight: '500' }}>${Math.round(mediumMetrics.financing.depositRequired)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      
+                      <div style={{ paddingTop: '8px', borderTop: '1px solid #e5e7eb' }}>
+                        <div style={{ fontWeight: '600', color: '#331A38' }}>200W + Drip ({dripMetrics.pumpsNeeded} system{dripMetrics.pumpsNeeded > 1 ? 's' : ''})</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Total cost:</span>
+                          <span style={{ fontWeight: '500' }}>${Math.round(dripMetrics.totalCapitalCost)}</span>
+                        </div>
+                        {paymentMethod !== 'upfront' && (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span>Monthly payment:</span>
+                              <span style={{ fontWeight: '500' }}>${dripMetrics.financing.monthlyPayment.toFixed(2)}</span>
+                            </div>
+                            {paymentMethod === 'financing' && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Deposit:</span>
+                                <span style={{ fontWeight: '500' }}>${Math.round(dripMetrics.financing.depositRequired)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Affordability alerts */}
+                    {allAffordabilityIssues.length > 0 && (
+                      <div style={{ marginTop: '12px' }}>
+                        {allAffordabilityIssues.map((issue, idx) => (
+                          <div key={idx} className={issue.severity === 'error' ? 'error-box' : 'warning-box'} style={{ marginBottom: '8px' }}>
+                            <strong>{issue.severity === 'error' ? '⛔' : '⚠️'}</strong> {issue.message}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {allAffordabilityIssues.length === 0 && (
+                      <div className="success-box" style={{ marginTop: '12px' }}>
+                        <strong>✓ Affordability check passed:</strong> {paymentMethod === 'upfront' ? 'Upfront costs are within sustainable range relative to household income.' : 'All monthly payments are within sustainable range relative to household income.'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Baseline Context */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div style={{ padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Baseline irrigation context</h3>
@@ -447,10 +829,6 @@ input[type="range"] {
                       <option value="established">{contexts.established.label}</option>
                     </select>
                     <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>{baseline.description}</p>
-                  </div>
-
-                  <div style={{ fontSize: '11px', color: '#4b5563', padding: '8px', background: '#fef3c7', borderRadius: '4px', marginBottom: '12px', lineHeight: '1.5' }}>
-                    <strong>Note:</strong> Baseline values (irrigation hours, costs) scale proportionally with your plot size. For example, if the reference is {baseline.irrigHours} hrs for {baseline.refPlotSize} ha, then {plotSize} ha would require {Math.round(baseline.irrigHours * (plotSize / baseline.refPlotSize))} hrs.
                   </div>
 
                   <SliderControl 
@@ -472,7 +850,7 @@ input[type="range"] {
                     max={200} 
                     step={5} 
                     unit=" USD/yr"
-                    helpText="Current annual spending on manual/diesel irrigation (for reference plot)"
+                    helpText="Current annual spending on manual/diesel irrigation"
                   />
 
                   <div style={{ marginBottom: '8px' }}>
@@ -481,175 +859,107 @@ input[type="range"] {
                       <span style={{ fontSize: '12px', fontWeight: '600', color: '#111827' }}>${cropValue.toFixed(2)}/kg</span>
                     </div>
                     <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px', fontStyle: 'italic' }}>{getCropValueLabel(cropValue)}</div>
-                    <input type="range" min={0.4} max={1.0} step={0.1} value={cropValue} onChange={(e) => setCropValue(parseFloat(e.target.value))} />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#6b7280', marginTop: '4px' }}>
-                      <span>$0.4<br/>Maize</span>
-                      <span>$0.6<br/>Beans</span>
-                      <span>$0.8<br/>Vegetables</span>
-                      <span>$1.0<br/>High-value</span>
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: '12px', padding: '8px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb', marginTop: '12px' }}>
-                    <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>Baseline conditions:</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Base yield:</span><span style={{ fontWeight: '500' }}>{baseline.baseYield} kg/ha/yr</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Seasons (baseline):</span><span style={{ fontWeight: '500' }}>{baseline.baseSeasons}</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Crop value:</span><span style={{ fontWeight: '500' }}>${cropValue.toFixed(2)}/kg</span></div>
+                    <input type="range" min={0.4} max={1.0} step={0.1} value={cropValue} onChange={(e) => setCropValue(parseFloat(e.target.value))} style={{ width: '100%' }} />
                   </div>
                 </div>
 
                 <div style={{ padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Intervention settings</h3>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Additional growing season</h3>
                   
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '4px' }}>Additional growing season enabled</label>
-                    <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px', fontStyle: 'italic' }}>Baseline: {baseline.baseSeasons} season{baseline.baseSeasons > 1 ? 's' : ''}/year ({baseline.label.toLowerCase()})</p>
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                      <button 
-                        onClick={() => setAdditionalSeasonEnabled(false)}
-                        style={{ 
-                          flex: 1, 
-                          padding: '6px', 
-                          fontSize: '12px', 
-                          borderRadius: '4px', 
-                          cursor: 'pointer',
-                          border: '1px solid #331A38',
-                          background: !additionalSeasonEnabled ? '#f97316' : 'white',
-                          color: !additionalSeasonEnabled ? 'white' : '#374151'
-                        }}
-                      >
-                        No
-                      </button>
-                      <button 
-                        onClick={() => setAdditionalSeasonEnabled(true)}
-                        style={{ 
-                          flex: 1, 
-                          padding: '6px', 
-                          fontSize: '12px', 
-                          borderRadius: '4px', 
-                          cursor: 'pointer',
-                          border: '1px solid #331A38',
-                          background: additionalSeasonEnabled ? '#f97316' : 'white',
-                          color: additionalSeasonEnabled ? 'white' : '#374151'
-                        }}
-                      >
-                        Yes
-                      </button>
+                  <p style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px', fontStyle: 'italic' }}>Baseline: {baseline.baseSeasons} season{baseline.baseSeasons > 1 ? 's' : ''}/year ({baseline.label.toLowerCase()})</p>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <button 
+                      onClick={() => setAdditionalSeasonEnabled(false)}
+                      style={{ 
+                        flex: 1, 
+                        padding: '6px', 
+                        fontSize: '12px', 
+                        borderRadius: '4px', 
+                        cursor: 'pointer',
+                        border: '1px solid #331A38',
+                        background: !additionalSeasonEnabled ? '#f97316' : 'white',
+                        color: !additionalSeasonEnabled ? 'white' : '#374151'
+                      }}
+                    >
+                      No
+                    </button>
+                    <button 
+                      onClick={() => setAdditionalSeasonEnabled(true)}
+                      style={{ 
+                        flex: 1, 
+                        padding: '6px', 
+                        fontSize: '12px', 
+                        borderRadius: '4px', 
+                        cursor: 'pointer',
+                        border: '1px solid #331A38',
+                        background: additionalSeasonEnabled ? '#f97316' : 'white',
+                        color: additionalSeasonEnabled ? 'white' : '#374151'
+                      }}
+                    >
+                      Yes
+                    </button>
+                  </div>
+                  {additionalSeasonEnabled && (
+                    <div style={{ fontSize: '11px', color: '#374151', padding: '8px', background: '#e0f2fe', borderRadius: '4px', marginBottom: '8px' }}>
+                      <div><strong>With additional season (adjusted for {technologyReliability}% reliability):</strong></div>
+                      <div>• 200W Pump: {baseline.baseSeasons} → {smallMetrics.effectiveSeasons.toFixed(1)} seasons</div>
+                      <div>• 400W Pump: {baseline.baseSeasons} → {mediumMetrics.effectiveSeasons.toFixed(1)} seasons</div>
+                      <div>• 200W + Drip: {baseline.baseSeasons} → {dripMetrics.effectiveSeasons.toFixed(1)} seasons</div>
                     </div>
-                    {additionalSeasonEnabled && (
-                      <div style={{ fontSize: '11px', color: '#374151', padding: '8px', background: '#e0f2fe', borderRadius: '4px' }}>
-                        <div><strong>With additional season:</strong></div>
-                        <div>• 200W Pump: {baseline.baseSeasons} → {smallMetrics.effectiveSeasons} seasons (+{smallMetrics.seasonsAdded.toFixed(1)} season{smallMetrics.seasonsAdded !== 1 ? 's' : ''})</div>
-                        <div>• 400W Pump: {baseline.baseSeasons} → {mediumMetrics.effectiveSeasons} seasons (+{mediumMetrics.seasonsAdded.toFixed(1)} season{mediumMetrics.seasonsAdded !== 1 ? 's' : ''})</div>
-                        <div>• 200W + Drip: {baseline.baseSeasons} → {dripMetrics.effectiveSeasons} seasons (+{dripMetrics.seasonsAdded.toFixed(1)} season{dripMetrics.seasonsAdded !== 1 ? 's' : ''})</div>
-                      </div>
-                    )}
-                    <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px', fontStyle: 'italic' }}>Solar irrigation provides reliable water supply during dry seasons, enabling year-round cultivation. Groundwater or surface water availability determines feasibility.</p>
-                  </div>
+                  )}
+                  <p style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>Solar irrigation provides reliable water supply during dry seasons, enabling year-round cultivation. Groundwater or surface water availability determines feasibility.</p>
 
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151', display: 'block', marginBottom: '4px' }}>Payment method</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        onClick={() => setPaymentMethod('upfront')}
-                        style={{ 
-                          flex: 1, 
-                          padding: '6px', 
-                          fontSize: '12px', 
-                          borderRadius: '4px', 
-                          cursor: 'pointer',
-                          border: '1px solid #331A38',
-                          background: paymentMethod === 'upfront' ? '#f97316' : 'white',
-                          color: paymentMethod === 'upfront' ? 'white' : '#374151'
-                        }}
-                      >
-                        Upfront
-                      </button>
-                      <button 
-                        onClick={() => setPaymentMethod('financing')}
-                        style={{ 
-                          flex: 1, 
-                          padding: '6px', 
-                          fontSize: '12px', 
-                          borderRadius: '4px', 
-                          cursor: 'pointer',
-                          border: '1px solid #331A38',
-                          background: paymentMethod === 'financing' ? '#f97316' : 'white',
-                          color: paymentMethod === 'financing' ? 'white' : '#374151'
-                        }}
-                      >
-                        Financing
-                      </button>
-                      <button 
-                        onClick={() => setPaymentMethod('rental')}
-                        style={{ 
-                          flex: 1, 
-                          padding: '6px', 
-                          fontSize: '12px', 
-                          borderRadius: '4px', 
-                          cursor: 'pointer',
-                          border: '1px solid #331A38',
-                          background: paymentMethod === 'rental' ? '#f97316' : 'white',
-                          color: paymentMethod === 'rental' ? 'white' : '#374151'
-                        }}
-                      >
-                        PAYG
-                      </button>
-                    </div>
-                    <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px', fontStyle: 'italic' }}>{getPaymentMethodDescription()}</p>
+                  <div style={{ fontSize: '12px', padding: '8px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb', marginTop: '12px' }}>
+                    <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>Baseline conditions:</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Base yield:</span><span style={{ fontWeight: '500' }}>{baseline.baseYield} kg/ha/season</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Seasons:</span><span style={{ fontWeight: '500' }}>{baseline.baseSeasons}/year</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Crop value:</span><span style={{ fontWeight: '500' }}>${cropValue.toFixed(2)}/kg</span></div>
                   </div>
-
-                  <div style={{ fontSize: '12px', color: '#374151', padding: '8px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb' }}>
-                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>Total capital costs ({paymentMethod}):</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>200W Pump:</span><span style={{ fontWeight: '500' }}>${Math.round(smallMetrics.totalCapitalCost)} ({smallMetrics.pumpsNeeded} {smallMetrics.pumpsNeeded === 1 ? 'pump' : 'pumps'})</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>400W Pump:</span><span style={{ fontWeight: '500' }}>${Math.round(mediumMetrics.totalCapitalCost)} ({mediumMetrics.pumpsNeeded} {mediumMetrics.pumpsNeeded === 1 ? 'pump' : 'pumps'})</span></div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>200W + Drip:</span><span style={{ fontWeight: '500' }}>${Math.round(dripMetrics.totalCapitalCost)} ({dripMetrics.pumpsNeeded} {dripMetrics.pumpsNeeded === 1 ? 'system' : 'systems'})</span></div>
-                  </div>
-
-                  <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '8px' }}><strong>Equipment lifespan:</strong> All systems: 7 years</p>
                 </div>
               </div>
 
+              {/* Income increase breakdown */}
               <div style={{ padding: '12px', background: '#eff6ff', borderLeft: '4px solid #331A38', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Income increase breakdown (annual)</h3>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Income increase breakdown (annual, at {technologyReliability}% reliability)</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '12px' }}>
                   <div>
                     <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>200W Pump</div>
-                    <div style={{ color: '#374151' }}>Yield improvements on {baseline.baseSeasons} season{baseline.baseSeasons > 1 ? 's' : ''}: +${Math.round(smallMetrics.yieldImprovementIncome)}</div>
+                    <div style={{ color: '#374151' }}>Yield improvement (+{smallMetrics.effectiveYieldIncrease.toFixed(0)}%): +${Math.round(smallMetrics.yieldImprovementIncome)}</div>
                     {smallMetrics.additionalSeasonIncome > 0 && (
-                      <div style={{ color: '#374151' }}>Additional {smallMetrics.seasonsAdded.toFixed(1)} season{smallMetrics.seasonsAdded !== 1 ? 's' : ''}: +${Math.round(smallMetrics.additionalSeasonIncome)}</div>
+                      <div style={{ color: '#374151' }}>Additional {smallMetrics.seasonsAdded.toFixed(1)} season: +${Math.round(smallMetrics.additionalSeasonIncome)}</div>
                     )}
-                    <div style={{ fontWeight: '500', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #d1d5db' }}>Total income increase: +${Math.round(smallMetrics.incomeIncrease)}</div>
+                    <div style={{ fontWeight: '500', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #d1d5db' }}>Total: +${Math.round(smallMetrics.incomeIncrease)}</div>
                   </div>
                   <div>
                     <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>400W Pump</div>
-                    <div style={{ color: '#374151' }}>Yield improvements on {baseline.baseSeasons} season{baseline.baseSeasons > 1 ? 's' : ''}: +${Math.round(mediumMetrics.yieldImprovementIncome)}</div>
+                    <div style={{ color: '#374151' }}>Yield improvement (+{mediumMetrics.effectiveYieldIncrease.toFixed(0)}%): +${Math.round(mediumMetrics.yieldImprovementIncome)}</div>
                     {mediumMetrics.additionalSeasonIncome > 0 && (
-                      <div style={{ color: '#374151' }}>Additional {mediumMetrics.seasonsAdded.toFixed(1)} season{mediumMetrics.seasonsAdded !== 1 ? 's' : ''}: +${Math.round(mediumMetrics.additionalSeasonIncome)}</div>
+                      <div style={{ color: '#374151' }}>Additional {mediumMetrics.seasonsAdded.toFixed(1)} season: +${Math.round(mediumMetrics.additionalSeasonIncome)}</div>
                     )}
-                    <div style={{ fontWeight: '500', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #d1d5db' }}>Total income increase: +${Math.round(mediumMetrics.incomeIncrease)}</div>
+                    <div style={{ fontWeight: '500', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #d1d5db' }}>Total: +${Math.round(mediumMetrics.incomeIncrease)}</div>
                   </div>
                   <div>
                     <div style={{ fontWeight: '600', marginBottom: '4px', color: '#331A38' }}>200W + Drip</div>
-                    <div style={{ color: '#374151' }}>Yield improvements on {baseline.baseSeasons} season{baseline.baseSeasons > 1 ? 's' : ''}: +${Math.round(dripMetrics.yieldImprovementIncome)}</div>
+                    <div style={{ color: '#374151' }}>Yield improvement (+{dripMetrics.effectiveYieldIncrease.toFixed(0)}%): +${Math.round(dripMetrics.yieldImprovementIncome)}</div>
                     {dripMetrics.additionalSeasonIncome > 0 && (
-                      <div style={{ color: '#374151' }}>Additional {dripMetrics.seasonsAdded.toFixed(1)} season{dripMetrics.seasonsAdded !== 1 ? 's' : ''}: +${Math.round(dripMetrics.additionalSeasonIncome)}</div>
+                      <div style={{ color: '#374151' }}>Additional {dripMetrics.seasonsAdded.toFixed(1)} season: +${Math.round(dripMetrics.additionalSeasonIncome)}</div>
                     )}
-                    <div style={{ fontWeight: '500', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #d1d5db' }}>Total income increase: +${Math.round(dripMetrics.incomeIncrease)}</div>
+                    <div style={{ fontWeight: '500', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #d1d5db' }}>Total: +${Math.round(dripMetrics.incomeIncrease)}</div>
                   </div>
                 </div>
               </div>
 
+              {/* Waterfall Charts */}
               <div style={{ marginBottom: '16px' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Economic waterfall analysis</h2>
+                <h2 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>Annualized economic impact</h2>
                 <p style={{ fontSize: '13px', color: '#4b5563', marginBottom: '12px', lineHeight: '1.5' }}>
-                  Each waterfall shows the annual household-level economic impact of solar irrigation adoption. Starting from the annualized capital cost (equipment + installation spread over 7-year lifespan), we add two benefit streams: crop income increases from both improved yields and additional growing seasons, and avoided irrigation costs (diesel, manual labor). The number of pumps needed scales proportionally with plot size based on each system's coverage capacity. The final bar shows net household benefit, representing whether the intervention delivers positive economic returns after accounting for all costs and benefits.
+                  Each chart shows annual costs (capital + maintenance) offset by income increases and avoided irrigation costs. Net benefit (green = positive, red = negative) indicates annual economic value.
                 </p>
                 
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '12px', fontSize: '11px' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '12px', fontSize: '11px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ width: '12px', height: '12px', background: '#f97316' }}></div>
-                    <span>Capital cost</span>
+                    <span>Annual costs</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ width: '12px', height: '12px', background: '#22c55e' }}></div>
@@ -669,11 +979,17 @@ input[type="range"] {
                   </div>
                 </div>
 
+                {technologyReliability < 80 && (
+                  <div className="warning-box">
+                    <strong>⚠️ Reliability concern:</strong> At {technologyReliability}% reliability, benefits are significantly reduced. Consider investigating water source constraints, solar irradiance, or maintenance capacity before investing.
+                  </div>
+                )}
+
                 <div style={{ padding: '16px', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb', background: '#f9fafb', marginBottom: '16px', display: 'flex', justifyContent: 'space-around', alignItems: 'start' }}>
                   <WaterfallChart 
                     incomeIncrease={smallMetrics.incomeIncrease}
                     costSavings={smallMetrics.costSavings}
-                    capitalCost={smallMetrics.annualCapitalCost}
+                    totalCosts={smallMetrics.totalCosts}
                     netBenefit={smallMetrics.netBenefit}
                     label="200W Pump"
                     pumpsNeeded={smallMetrics.pumpsNeeded}
@@ -681,7 +997,7 @@ input[type="range"] {
                   <WaterfallChart 
                     incomeIncrease={mediumMetrics.incomeIncrease}
                     costSavings={mediumMetrics.costSavings}
-                    capitalCost={mediumMetrics.annualCapitalCost}
+                    totalCosts={mediumMetrics.totalCosts}
                     netBenefit={mediumMetrics.netBenefit}
                     label="400W Pump"
                     pumpsNeeded={mediumMetrics.pumpsNeeded}
@@ -689,7 +1005,7 @@ input[type="range"] {
                   <WaterfallChart 
                     incomeIncrease={dripMetrics.incomeIncrease}
                     costSavings={dripMetrics.costSavings}
-                    capitalCost={dripMetrics.annualCapitalCost}
+                    totalCosts={dripMetrics.totalCosts}
                     netBenefit={dripMetrics.netBenefit}
                     label="200W + Drip"
                     pumpsNeeded={dripMetrics.pumpsNeeded}
@@ -697,21 +1013,22 @@ input[type="range"] {
                 </div>
               </div>
 
+              {/* Economic Analysis Table */}
               <div style={{ padding: '16px', background: '#f9fafb', borderRadius: '6px', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Economic analysis</h3>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Economic analysis summary</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', fontSize: '12px' }}>
                   <div style={{ padding: '12px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
                     <div style={{ fontWeight: '600', marginBottom: '8px' }}>{pumps.small.name}</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Pumps needed:</span><span style={{ fontWeight: '500' }}>{smallMetrics.pumpsNeeded}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total capital ({paymentMethod}):</span><span style={{ fontWeight: '500' }}>${Math.round(smallMetrics.totalCapitalCost)}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Annual capital cost:</span><span style={{ fontWeight: '500' }}>${Math.round(smallMetrics.annualCapitalCost)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Units needed:</span><span style={{ fontWeight: '500' }}>{smallMetrics.pumpsNeeded}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Capital (annual):</span><span style={{ fontWeight: '500' }}>${Math.round(smallMetrics.annualCapitalCost)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Maintenance:</span><span style={{ fontWeight: '500' }}>${Math.round(smallMetrics.totalMaintenance)}</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Income increase:</span><span style={{ fontWeight: '500', color: '#16a34a' }}>+${Math.round(smallMetrics.incomeIncrease)}</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Cost savings:</span><span style={{ fontWeight: '500', color: '#7c3aed' }}>+${Math.round(smallMetrics.costSavings)}</span></div>
                       <div style={{ borderTop: '1px solid #d1d5db', paddingTop: '4px', marginTop: '4px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}><span>Net annual benefit:</span><span style={{ color: smallMetrics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{smallMetrics.netBenefit >= 0 ? '+' : ''}${Math.round(smallMetrics.netBenefit)}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: smallMetrics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{smallMetrics.roi >= 0 ? '+' : ''}{Math.round(smallMetrics.roi)}%</span></div>
-                        {smallMetrics.paybackYears && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback period:</span><span style={{ color: '#16a34a' }}>{smallMetrics.paybackYears.toFixed(1)} yrs</span></div>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: smallMetrics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{Math.round(smallMetrics.roi)}%</span></div>
+                        {smallMetrics.paybackYears && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback:</span><span style={{ color: '#16a34a' }}>{smallMetrics.paybackYears.toFixed(1)} yrs</span></div>}
                       </div>
                     </div>
                   </div>
@@ -719,15 +1036,15 @@ input[type="range"] {
                   <div style={{ padding: '12px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
                     <div style={{ fontWeight: '600', marginBottom: '8px' }}>{pumps.medium.name}</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Pumps needed:</span><span style={{ fontWeight: '500' }}>{mediumMetrics.pumpsNeeded}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total capital ({paymentMethod}):</span><span style={{ fontWeight: '500' }}>${Math.round(mediumMetrics.totalCapitalCost)}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Annual capital cost:</span><span style={{ fontWeight: '500' }}>${Math.round(mediumMetrics.annualCapitalCost)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Units needed:</span><span style={{ fontWeight: '500' }}>{mediumMetrics.pumpsNeeded}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Capital (annual):</span><span style={{ fontWeight: '500' }}>${Math.round(mediumMetrics.annualCapitalCost)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Maintenance:</span><span style={{ fontWeight: '500' }}>${Math.round(mediumMetrics.totalMaintenance)}</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Income increase:</span><span style={{ fontWeight: '500', color: '#16a34a' }}>+${Math.round(mediumMetrics.incomeIncrease)}</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Cost savings:</span><span style={{ fontWeight: '500', color: '#7c3aed' }}>+${Math.round(mediumMetrics.costSavings)}</span></div>
                       <div style={{ borderTop: '1px solid #d1d5db', paddingTop: '4px', marginTop: '4px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}><span>Net annual benefit:</span><span style={{ color: mediumMetrics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{mediumMetrics.netBenefit >= 0 ? '+' : ''}${Math.round(mediumMetrics.netBenefit)}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: mediumMetrics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{mediumMetrics.roi >= 0 ? '+' : ''}{Math.round(mediumMetrics.roi)}%</span></div>
-                        {mediumMetrics.paybackYears && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback period:</span><span style={{ color: '#16a34a' }}>{mediumMetrics.paybackYears.toFixed(1)} yrs</span></div>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: mediumMetrics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{Math.round(mediumMetrics.roi)}%</span></div>
+                        {mediumMetrics.paybackYears && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback:</span><span style={{ color: '#16a34a' }}>{mediumMetrics.paybackYears.toFixed(1)} yrs</span></div>}
                       </div>
                     </div>
                   </div>
@@ -736,42 +1053,48 @@ input[type="range"] {
                     <div style={{ fontWeight: '600', marginBottom: '8px' }}>{pumps.drip.name}</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Systems needed:</span><span style={{ fontWeight: '500' }}>{dripMetrics.pumpsNeeded}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Total capital ({paymentMethod}):</span><span style={{ fontWeight: '500' }}>${Math.round(dripMetrics.totalCapitalCost)}</span></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Annual capital cost:</span><span style={{ fontWeight: '500' }}>${Math.round(dripMetrics.annualCapitalCost)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Capital (annual):</span><span style={{ fontWeight: '500' }}>${Math.round(dripMetrics.annualCapitalCost)}</span></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Maintenance:</span><span style={{ fontWeight: '500' }}>${Math.round(dripMetrics.totalMaintenance)}</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Income increase:</span><span style={{ fontWeight: '500', color: '#16a34a' }}>+${Math.round(dripMetrics.incomeIncrease)}</span></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Cost savings:</span><span style={{ fontWeight: '500', color: '#7c3aed' }}>+${Math.round(dripMetrics.costSavings)}</span></div>
                       <div style={{ borderTop: '1px solid #d1d5db', paddingTop: '4px', marginTop: '4px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}><span>Net annual benefit:</span><span style={{ color: dripMetrics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{dripMetrics.netBenefit >= 0 ? '+' : ''}${Math.round(dripMetrics.netBenefit)}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: dripMetrics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{dripMetrics.roi >= 0 ? '+' : ''}{Math.round(dripMetrics.roi)}%</span></div>
-                        {dripMetrics.paybackYears && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback period:</span><span style={{ color: '#16a34a' }}>{dripMetrics.paybackYears.toFixed(1)} yrs</span></div>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>ROI:</span><span style={{ color: dripMetrics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{Math.round(dripMetrics.roi)}%</span></div>
+                        {dripMetrics.paybackYears && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Payback:</span><span style={{ color: '#16a34a' }}>{dripMetrics.paybackYears.toFixed(1)} yrs</span></div>}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Summary boxes */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '12px' }}>
                 <div style={{ padding: '12px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '6px' }}>
                   <h3 style={{ fontWeight: '600', marginBottom: '8px' }}>Baseline agricultural context</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: '#374151' }}>
                     <div><strong>Irrigation method:</strong> {baselineContext === 'rainfed' ? 'Manual watering (buckets/jerrycans)' : baselineContext === 'manual' ? 'Manual/diesel irrigation' : 'Established irrigation system'}</div>
-                    <div><strong>Base crop yield:</strong> {baseline.baseYield} kg/ha/year (maize equivalent)</div>
-                    <div><strong>Growing seasons:</strong> {baseline.baseSeasons} ({baseline.label.toLowerCase()})</div>
+                    <div><strong>Base crop yield:</strong> {baseline.baseYield} kg/ha/season</div>
+                    <div><strong>Growing seasons:</strong> {baseline.baseSeasons}/year</div>
                     <div><strong>Crop value:</strong> ${cropValue.toFixed(2)}/kg</div>
-                    <div><strong>Current crop income:</strong> ${Math.round(plotSize * baseline.baseYield * cropValue * baseline.baseSeasons)}/year</div>
+                    <div><strong>Household income:</strong> ${monthlyHouseholdIncome}/month</div>
                   </div>
                 </div>
 
                 <div style={{ padding: '12px', background: '#dcfce7', border: '1px solid #22c55e', borderRadius: '6px' }}>
                   <h3 style={{ fontWeight: '600', marginBottom: '8px' }}>Impact with solar irrigation</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', color: '#374151' }}>
-                    <div><strong>Yield increase:</strong> +13-20% (RCT evidence from Kenya)</div>
-                    <div><strong>Growing seasons:</strong> Up to 2-3 seasons (water availability dependent)</div>
+                    <div><strong>Yield increase:</strong> +11-17% (at {technologyReliability}% reliability)</div>
+                    <div><strong>Growing seasons:</strong> Up to {Math.max(smallMetrics.effectiveSeasons, mediumMetrics.effectiveSeasons, dripMetrics.effectiveSeasons).toFixed(1)} seasons</div>
                     <div><strong>Water efficiency:</strong> 2.5-5.0x improvement over manual</div>
-                    <div><strong>Environmental:</strong> Zero diesel emissions, reduced groundwater depletion</div>
+                    <div><strong>Environmental:</strong> Zero diesel emissions</div>
                     <div><strong>Evidence strength:</strong> High (Kenya RCTs + deployment data)</div>
                   </div>
                 </div>
+              </div>
+
+              {/* Model notes */}
+              <div style={{ marginTop: '16px', padding: '12px', background: '#f3f4f6', borderRadius: '6px', fontSize: '11px', color: '#6b7280', lineHeight: '1.5' }}>
+                <strong>Model assumptions:</strong> Equipment lifespan 7 years for all systems. Financing terms based on agricultural finance market data from East Africa. Technology reliability factor adjusts both yield improvements and additional season benefits. Maintenance costs scale with number of units deployed. Additional growing season benefits depend on water source availability (groundwater or surface water).
               </div>
             </div>
           );
