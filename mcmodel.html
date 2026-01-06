@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Milk Chiller ROI Analysis v2</title>
+    <title>Milk Chiller ROI Analysis v2.1</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -55,9 +55,6 @@
         };
 
         function MilkChillerWidget() {
-          // Country presets
-          const [country, setCountry] = useState('kenya');
-          
           // Core farmer profile
           const [numCows, setNumCows] = useState(7);
           const [avgLitersPerCow, setAvgLitersPerCow] = useState(6);
@@ -74,11 +71,10 @@
           const [baselineSpoilageRate, setBaselineSpoilageRate] = useState(12);
           const [qualityPremium, setQualityPremium] = useState(0);
           
-          // Transport
-          const [transportMode, setTransportMode] = useState('bicycle');
+          // Transport - simplified
           const [transportCostPerTrip, setTransportCostPerTrip] = useState(0.75);
           
-          // Technology costs (higher baseline)
+          // Technology costs
           const [chiller50Cost, setChiller50Cost] = useState(1100);
           const [chiller100Cost, setChiller100Cost] = useState(1400);
           const [chiller165Cost, setChiller165Cost] = useState(1700);
@@ -103,66 +99,6 @@
           
           // Farmer income context for affordability
           const [monthlyDairyIncome, setMonthlyDairyIncome] = useState(150);
-
-          // Country presets
-          const countryPresets = {
-            kenya: {
-              name: "Kenya",
-              milkPrice: 0.35,
-              localRetailPrice: 0.20,
-              currency: "KSH",
-              exchangeRate: 130,
-              avgYield: 6,
-              description: "KCC pays ~50 KSH/L ($0.35-0.40). Well-developed cooperative system."
-            },
-            rwanda: {
-              name: "Rwanda",
-              milkPrice: 0.22,
-              localRetailPrice: 0.14,
-              currency: "RWF",
-              exchangeRate: 1300,
-              avgYield: 5,
-              description: "Lower milk prices (~220 RWF/L). Growing cooperative network."
-            },
-            tanzania: {
-              name: "Tanzania",
-              milkPrice: 0.28,
-              localRetailPrice: 0.18,
-              currency: "TZS",
-              exchangeRate: 2500,
-              avgYield: 5,
-              description: "Mixed formal/informal market. ~700 TZS/L cooperative price."
-            },
-            uganda: {
-              name: "Uganda",
-              milkPrice: 0.25,
-              localRetailPrice: 0.16,
-              currency: "UGX",
-              exchangeRate: 3700,
-              avgYield: 5,
-              description: "Lower prices (~900 UGX/L). High informal market share."
-            }
-          };
-
-          // Apply country preset
-          useEffect(() => {
-            const preset = countryPresets[country];
-            setMilkPrice(preset.milkPrice);
-            setLocalRetailPrice(preset.localRetailPrice);
-            setAvgLitersPerCow(preset.avgYield);
-          }, [country]);
-
-          // Transport mode presets
-          const transportModes = {
-            walking: { name: "Walking/carrying", costPerTrip: 0, description: "No direct cost, but time opportunity cost" },
-            bicycle: { name: "Bicycle", costPerTrip: 0.75, description: "Fuel/maintenance equivalent ~$0.75/trip" },
-            motorcycle_hire: { name: "Motorcycle hire (boda)", costPerTrip: 2.00, description: "Typical hire cost $1.50-2.50/trip" },
-            own_motorcycle: { name: "Own motorcycle", costPerTrip: 1.00, description: "Fuel + maintenance ~$1/trip" }
-          };
-
-          useEffect(() => {
-            setTransportCostPerTrip(transportModes[transportMode].costPerTrip);
-          }, [transportMode]);
 
           // Baseline contexts configuration
           const contexts = {
@@ -402,34 +338,113 @@
           const chiller100Economics = calculateEconomics('chiller100');
           const chiller165Economics = calculateEconomics('chiller165');
 
-          // Waterfall chart component
+          // FIXED Waterfall chart component
           const WaterfallChart = ({ economics, label, chillerKey }) => {
             const { annualCapital, maintenance, eveningMilkIncome, qualityPremiumIncome, spoilageSavings, transportSavings, netBenefit } = economics;
             const totalCosts = annualCapital + maintenance;
             
-            const allValues = [
-              totalCosts, 
-              Math.abs(eveningMilkIncome), 
-              Math.abs(qualityPremiumIncome),
-              Math.abs(spoilageSavings),
-              Math.abs(transportSavings),
-              Math.abs(netBenefit)
-            ];
-            const maxValue = Math.max(...allValues) * 1.2;
-            const scale = 120 / maxValue;
+            // Get all values for scaling
+            const values = [totalCosts, eveningMilkIncome, qualityPremiumIncome, spoilageSavings, transportSavings, netBenefit];
+            const absValues = values.map(v => Math.abs(v));
+            const maxAbsValue = Math.max(...absValues, 1) * 1.3;
+            
+            const chartHeight = 180;
+            const zeroLine = chartHeight / 2; // Zero line in the middle
+            const scale = (chartHeight / 2) / maxAbsValue;
 
-            const zero = 120;
-            const step1 = zero + (totalCosts * scale);
-            const step2 = step1 - (eveningMilkIncome * scale);
-            const step3 = step2 - (qualityPremiumIncome * scale);
-            const step4 = step3 - (spoilageSavings * scale);
-            const step5 = step4 - (transportSavings * scale);
+            // Calculate cumulative positions for waterfall
+            // Start at 0, subtract costs, then add benefits
+            let runningTotal = 0;
+            
+            // Costs (negative)
+            const costStart = runningTotal;
+            runningTotal -= totalCosts;
+            const costEnd = runningTotal;
+            
+            // Evening milk (can be positive or negative)
+            const eveningStart = runningTotal;
+            runningTotal += eveningMilkIncome;
+            const eveningEnd = runningTotal;
+            
+            // Quality premium
+            const qualityStart = runningTotal;
+            runningTotal += qualityPremiumIncome;
+            const qualityEnd = runningTotal;
+            
+            // Spoilage savings
+            const spoilageStart = runningTotal;
+            runningTotal += spoilageSavings;
+            const spoilageEnd = runningTotal;
+            
+            // Transport savings
+            const transportStart = runningTotal;
+            runningTotal += transportSavings;
+            const transportEnd = runningTotal;
+            
+            // Final net benefit (from zero)
+            const netStart = 0;
+            const netEnd = netBenefit;
 
-            const barWidth = 45;
-            const gap = 12;
+            const barWidth = 42;
+            const gap = 14;
             const totalWidth = (barWidth * 6) + (gap * 5);
 
             const capacityCheck = checkCapacity(chillerKey);
+
+            // Helper to convert value to Y position (positive = up from zero, negative = down from zero)
+            const valueToY = (val) => zeroLine - (val * scale);
+
+            // Helper to render a bar
+            const renderBar = (startVal, endVal, color, labelText, xPos, barLabel) => {
+              const y1 = valueToY(startVal);
+              const y2 = valueToY(endVal);
+              const top = Math.min(y1, y2);
+              const height = Math.max(Math.abs(y2 - y1), 2);
+              const change = endVal - startVal;
+              const isPositive = change >= 0;
+              
+              return (
+                <div style={{ position: 'absolute', left: `${xPos}px` }}>
+                  <div style={{ 
+                    width: `${barWidth}px`,
+                    height: `${height}px`,
+                    position: 'absolute',
+                    top: `${top}px`,
+                    background: color
+                  }}>
+                    <div style={{ 
+                      color: height > 20 ? 'white' : color,
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      textAlign: 'center',
+                      position: height > 20 ? 'relative' : 'absolute',
+                      top: height > 20 ? '4px' : (isPositive ? '-16px' : `${height + 2}px`),
+                      width: '100%',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {labelText}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '10px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: `${chartHeight + 8}px`, lineHeight: '1.2', fontWeight: '500' }}>
+                    {barLabel}
+                  </div>
+                </div>
+              );
+            };
+
+            // Connector line helper
+            const renderConnector = (fromVal, xPos) => {
+              const y = valueToY(fromVal);
+              return (
+                <div style={{ 
+                  position: 'absolute', 
+                  left: `${xPos + barWidth}px`, 
+                  top: `${y}px`, 
+                  width: `${gap}px`, 
+                  borderTop: '1px dashed #9ca3af' 
+                }} />
+              );
+            };
 
             return (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -437,165 +452,39 @@
                 <div style={{ fontSize: '12px', color: capacityCheck.color, marginBottom: '8px', fontWeight: '500' }}>
                   {capacityCheck.message} ({Math.round((eveningMilkVolume / technologies[chillerKey].capacity) * 100)}% utilization)
                 </div>
-                <div style={{ position: 'relative', width: `${totalWidth}px`, height: '270px' }}>
+                <div style={{ position: 'relative', width: `${totalWidth}px`, height: `${chartHeight + 40}px` }}>
                   {/* Zero line */}
-                  <div style={{ position: 'absolute', width: '100%', borderTop: '1px solid #9ca3af', top: `${zero}px` }} />
-                  <div style={{ position: 'absolute', fontSize: '13px', color: '#6b7280', top: `${zero - 12}px`, left: '-25px' }}>$0</div>
+                  <div style={{ position: 'absolute', width: '100%', borderTop: '1px solid #374151', top: `${zeroLine}px` }} />
+                  <div style={{ position: 'absolute', fontSize: '11px', color: '#6b7280', top: `${zeroLine - 8}px`, left: '-20px' }}>$0</div>
 
-                  {/* Total Costs (Capital + Maintenance) */}
-                  <div style={{ position: 'absolute', left: '0px' }}>
-                    <div style={{ width: `${barWidth}px`, height: `${Math.abs(totalCosts * scale)}px`, position: 'absolute', top: `${zero}px`, background: '#f97316' }}>
-                      <div style={{ 
-                        color: Math.abs(totalCosts * scale) > 20 ? 'white' : '#f97316',
-                        fontSize: '12px', 
-                        fontWeight: '700',
-                        textAlign: 'center',
-                        position: Math.abs(totalCosts * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(totalCosts * scale) > 20 ? '6px' : '-18px',
-                        width: '100%'
-                      }}>
-                        -${Math.round(totalCosts)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: '245px', lineHeight: '1.2', fontWeight: '500' }}>
-                      Annual<br/>costs
-                    </div>
-                    <div style={{ position: 'absolute', width: `${gap}px`, left: `${barWidth}px`, top: `${step1}px`, borderTop: '1px dashed #d1d5db' }} />
-                  </div>
+                  {/* Cost bar (from 0 going down) */}
+                  {renderBar(costStart, costEnd, '#f97316', `-$${Math.round(totalCosts)}`, 0, 'Annual\ncosts')}
+                  {renderConnector(costEnd, 0)}
 
-                  {/* Evening Milk Income */}
-                  <div style={{ position: 'absolute', left: `${barWidth + gap}px` }}>
-                    <div style={{ 
-                      width: `${barWidth}px`,
-                      height: `${Math.abs(eveningMilkIncome * scale)}px`,
-                      position: 'absolute',
-                      top: `${step2}px`,
-                      background: '#22c55e'
-                    }}>
-                      <div style={{ 
-                        color: Math.abs(eveningMilkIncome * scale) > 20 ? 'white' : '#16a34a',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        textAlign: 'center',
-                        position: Math.abs(eveningMilkIncome * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(eveningMilkIncome * scale) > 20 ? '6px' : '-18px',
-                        width: '100%'
-                      }}>
-                        +${Math.round(eveningMilkIncome)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: '245px', lineHeight: '1.2', fontWeight: '500' }}>
-                      Evening<br/>milk
-                    </div>
-                    <div style={{ position: 'absolute', width: `${gap}px`, left: `${barWidth}px`, top: `${step2}px`, borderTop: '1px dashed #d1d5db' }} />
-                  </div>
+                  {/* Evening milk bar */}
+                  {renderBar(eveningStart, eveningEnd, eveningMilkIncome >= 0 ? '#22c55e' : '#ef4444', 
+                    `${eveningMilkIncome >= 0 ? '+' : ''}$${Math.round(eveningMilkIncome)}`, 
+                    barWidth + gap, 'Evening\nmilk')}
+                  {renderConnector(eveningEnd, barWidth + gap)}
 
-                  {/* Quality Premium */}
-                  <div style={{ position: 'absolute', left: `${(barWidth + gap) * 2}px` }}>
-                    <div style={{ 
-                      width: `${barWidth}px`,
-                      height: `${Math.max(Math.abs(qualityPremiumIncome * scale), 2)}px`,
-                      position: 'absolute',
-                      top: `${step3}px`,
-                      background: '#8b5cf6'
-                    }}>
-                      <div style={{ 
-                        color: Math.abs(qualityPremiumIncome * scale) > 20 ? 'white' : '#7c3aed',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        textAlign: 'center',
-                        position: Math.abs(qualityPremiumIncome * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(qualityPremiumIncome * scale) > 20 ? '6px' : '-18px',
-                        width: '100%'
-                      }}>
-                        +${Math.round(qualityPremiumIncome)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: '245px', lineHeight: '1.2', fontWeight: '500' }}>
-                      Quality<br/>premium
-                    </div>
-                    <div style={{ position: 'absolute', width: `${gap}px`, left: `${barWidth}px`, top: `${step3}px`, borderTop: '1px dashed #d1d5db' }} />
-                  </div>
+                  {/* Quality premium bar */}
+                  {renderBar(qualityStart, qualityEnd, '#8b5cf6', `+$${Math.round(qualityPremiumIncome)}`, 
+                    (barWidth + gap) * 2, 'Quality\npremium')}
+                  {renderConnector(qualityEnd, (barWidth + gap) * 2)}
 
-                  {/* Spoilage Reduction */}
-                  <div style={{ position: 'absolute', left: `${(barWidth + gap) * 3}px` }}>
-                    <div style={{ 
-                      width: `${barWidth}px`,
-                      height: `${Math.abs(spoilageSavings * scale)}px`,
-                      position: 'absolute',
-                      top: `${step4}px`,
-                      background: '#60a5fa'
-                    }}>
-                      <div style={{ 
-                        color: Math.abs(spoilageSavings * scale) > 20 ? 'white' : '#2563eb',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        textAlign: 'center',
-                        position: Math.abs(spoilageSavings * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(spoilageSavings * scale) > 20 ? '6px' : '-18px',
-                        width: '100%'
-                      }}>
-                        +${Math.round(spoilageSavings)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: '245px', lineHeight: '1.2', fontWeight: '500' }}>
-                      Spoilage<br/>savings
-                    </div>
-                    <div style={{ position: 'absolute', width: `${gap}px`, left: `${barWidth}px`, top: `${step4}px`, borderTop: '1px dashed #d1d5db' }} />
-                  </div>
+                  {/* Spoilage savings bar */}
+                  {renderBar(spoilageStart, spoilageEnd, '#60a5fa', `+$${Math.round(spoilageSavings)}`, 
+                    (barWidth + gap) * 3, 'Spoilage\nsavings')}
+                  {renderConnector(spoilageEnd, (barWidth + gap) * 3)}
 
-                  {/* Transport Savings */}
-                  <div style={{ position: 'absolute', left: `${(barWidth + gap) * 4}px` }}>
-                    <div style={{ 
-                      width: `${barWidth}px`,
-                      height: `${Math.max(Math.abs(transportSavings * scale), 2)}px`,
-                      position: 'absolute',
-                      top: `${step5}px`,
-                      background: '#06b6d4'
-                    }}>
-                      <div style={{ 
-                        color: Math.abs(transportSavings * scale) > 20 ? 'white' : '#0891b2',
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        textAlign: 'center',
-                        position: Math.abs(transportSavings * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(transportSavings * scale) > 20 ? '6px' : '-18px',
-                        width: '100%'
-                      }}>
-                        +${Math.round(transportSavings)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: '245px', lineHeight: '1.2', fontWeight: '500' }}>
-                      Transport<br/>savings
-                    </div>
-                    <div style={{ position: 'absolute', width: `${gap}px`, left: `${barWidth}px`, top: `${step5}px`, borderTop: '1px dashed #d1d5db' }} />
-                  </div>
+                  {/* Transport savings bar */}
+                  {renderBar(transportStart, transportEnd, '#06b6d4', `+$${Math.round(transportSavings)}`, 
+                    (barWidth + gap) * 4, 'Transport\nsavings')}
 
-                  {/* Net Benefit */}
-                  <div style={{ position: 'absolute', left: `${(barWidth + gap) * 5}px` }}>
-                    <div style={{ 
-                      width: `${barWidth}px`,
-                      height: `${Math.abs(netBenefit * scale)}px`,
-                      position: 'absolute',
-                      top: `${netBenefit >= 0 ? step5 : zero}px`,
-                      background: netBenefit >= 0 ? '#16a34a' : '#dc2626'
-                    }}>
-                      <div style={{ 
-                        color: Math.abs(netBenefit * scale) > 20 ? 'white' : (netBenefit >= 0 ? '#16a34a' : '#dc2626'),
-                        fontSize: '12px',
-                        fontWeight: '700',
-                        textAlign: 'center',
-                        position: Math.abs(netBenefit * scale) > 20 ? 'relative' : 'absolute',
-                        top: Math.abs(netBenefit * scale) > 20 ? '6px' : (netBenefit >= 0 ? '-18px' : `${Math.abs(netBenefit * scale) + 6}px`),
-                        width: '100%'
-                      }}>
-                        {netBenefit >= 0 ? '+' : ''}${Math.round(netBenefit)}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', textAlign: 'center', fontWeight: '600', width: `${barWidth}px`, position: 'absolute', top: '245px', lineHeight: '1.2' }}>
-                      Net<br/>benefit
-                    </div>
-                  </div>
+                  {/* Net benefit bar (from zero) */}
+                  {renderBar(netStart, netEnd, netBenefit >= 0 ? '#16a34a' : '#dc2626', 
+                    `${netBenefit >= 0 ? '+' : ''}$${Math.round(netBenefit)}`, 
+                    (barWidth + gap) * 5, 'Net\nbenefit')}
                 </div>
               </div>
             );
@@ -638,12 +527,12 @@
 
           return (
             <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '16px', background: 'white' }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '4px' }}>Solar milk chiller economic impact model (v2)</h1>
+              <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '4px' }}>Solar milk chiller economic impact model (v2.1)</h1>
               <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '16px' }}>Updated with realistic financing, affordability checks, and conservative assumptions</p>
               
               {/* Key changes callout */}
               <div style={{ padding: '12px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '6px', marginBottom: '16px', fontSize: '12px', color: '#92400e', lineHeight: '1.5' }}>
-                <strong>Model updates (v2):</strong> Country-specific price presets, realistic financing costs (25-35% APR vs. previous 7%), deposit requirements, maintenance costs ($35/year), technology reliability adjustments, shared ownership scenarios, and affordability checks against farmer income.
+                <strong>Model updates (v2):</strong> Realistic financing costs (25-35% APR vs. previous 7%), deposit requirements, maintenance costs ($35/year), technology reliability adjustments, shared ownership scenarios, and affordability checks against farmer income.
               </div>
 
               {/* Context box */}
@@ -652,79 +541,61 @@
                   <strong>Target segment:</strong> Medium-scale dairy farmers (7-15 cows) in areas with limited evening collection infrastructure. Individual milk chillers are most viable for farmers with 7+ cows. Smaller farmers may benefit from shared ownership arrangements or cooperative-level solutions.
                 </p>
                 <p>
-                  <strong>Key value driver:</strong> Evening milk that would be sold to local retailers at $0.14-0.20/L can instead be preserved and sold to cooperatives at $0.22-0.35/L. The price differential and increased market access drive most of the economic return.
+                  <strong>Key value driver:</strong> Evening milk that would be sold to local retailers at lower prices can instead be preserved and sold to cooperatives at full price. The price differential and increased market access drive most of the economic return.
                 </p>
               </div>
 
-              {/* Country and Ownership Selection */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                <div style={{ padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Country context</h3>
-                  <select 
-                    value={country} 
-                    onChange={(e) => setCountry(e.target.value)}
-                    style={{ width: '100%', padding: '8px', marginBottom: '8px', border: '1px solid #331A38', borderRadius: '4px', fontSize: '12px' }}
+              {/* Ownership Selection */}
+              <div style={{ padding: '12px', background: '#f9fafb', borderRadius: '6px', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Ownership model</h3>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <button 
+                    onClick={() => setOwnershipModel('individual')} 
+                    style={{ 
+                      flex: 1,
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      border: '1px solid #331A38',
+                      background: ownershipModel === 'individual' ? '#331A38' : 'white',
+                      color: ownershipModel === 'individual' ? 'white' : '#374151'
+                    }}
                   >
-                    {Object.entries(countryPresets).map(([key, preset]) => (
-                      <option key={key} value={key}>{preset.name}</option>
-                    ))}
-                  </select>
-                  <div style={{ fontSize: '11px', color: '#4b5563', padding: '8px', background: '#e0f2fe', borderRadius: '4px' }}>
-                    {countryPresets[country].description}
-                  </div>
+                    Individual
+                  </button>
+                  <button 
+                    onClick={() => setOwnershipModel('shared')} 
+                    style={{ 
+                      flex: 1,
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      border: '1px solid #331A38',
+                      background: ownershipModel === 'shared' ? '#331A38' : 'white',
+                      color: ownershipModel === 'shared' ? 'white' : '#374151'
+                    }}
+                  >
+                    Shared (2-4 farmers)
+                  </button>
                 </div>
-
-                <div style={{ padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Ownership model</h3>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                    <button 
-                      onClick={() => setOwnershipModel('individual')} 
-                      style={{ 
-                        flex: 1,
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        border: '1px solid #331A38',
-                        background: ownershipModel === 'individual' ? '#331A38' : 'white',
-                        color: ownershipModel === 'individual' ? 'white' : '#374151'
-                      }}
-                    >
-                      Individual
-                    </button>
-                    <button 
-                      onClick={() => setOwnershipModel('shared')} 
-                      style={{ 
-                        flex: 1,
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        border: '1px solid #331A38',
-                        background: ownershipModel === 'shared' ? '#331A38' : 'white',
-                        color: ownershipModel === 'shared' ? 'white' : '#374151'
-                      }}
-                    >
-                      Shared (2-4 farmers)
-                    </button>
-                  </div>
-                  {ownershipModel === 'shared' && (
-                    <SliderControl
-                      label="Number of farmers sharing"
-                      value={numFarmersSharing}
-                      onChange={setNumFarmersSharing}
-                      min={2}
-                      max={4}
-                      step={1}
-                      helpText="Each farmer contributes cows and shares costs/benefits"
-                    />
-                  )}
-                  <div style={{ fontSize: '11px', color: '#4b5563', padding: '8px', background: ownershipModel === 'shared' ? '#dcfce7' : '#f3f4f6', borderRadius: '4px' }}>
-                    {ownershipModel === 'shared' 
-                      ? `Shared ownership splits capital costs and deposit requirements across ${numFarmersSharing} farmers, improving affordability.`
-                      : 'Single farmer bears full capital cost and receives all benefits.'
-                    }
-                  </div>
+                {ownershipModel === 'shared' && (
+                  <SliderControl
+                    label="Number of farmers sharing"
+                    value={numFarmersSharing}
+                    onChange={setNumFarmersSharing}
+                    min={2}
+                    max={4}
+                    step={1}
+                    helpText="Each farmer contributes cows and shares costs/benefits"
+                  />
+                )}
+                <div style={{ fontSize: '11px', color: '#4b5563', padding: '8px', background: ownershipModel === 'shared' ? '#dcfce7' : '#f3f4f6', borderRadius: '4px' }}>
+                  {ownershipModel === 'shared' 
+                    ? `Shared ownership splits capital costs and deposit requirements across ${numFarmersSharing} farmers, improving affordability.`
+                    : 'Single farmer bears full capital cost and receives all benefits.'
+                  }
                 </div>
               </div>
 
@@ -1063,7 +934,7 @@
                     max={0.50}
                     step={0.01}
                     unit=" USD/L"
-                    helpText={`${countryPresets[country].name} typical: $${countryPresets[country].milkPrice}/L`}
+                    helpText="Kenya ~$0.35/L | Rwanda ~$0.22/L | Tanzania ~$0.28/L"
                   />
                   
                   <SliderControl
@@ -1112,27 +983,32 @@
                 </div>
 
                 <div style={{ padding: '12px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Transport parameters</h3>
-                  <select 
-                    value={transportMode} 
-                    onChange={(e) => setTransportMode(e.target.value)}
-                    style={{ width: '100%', padding: '8px', marginBottom: '8px', border: '1px solid #331A38', borderRadius: '4px', fontSize: '12px' }}
-                  >
-                    {Object.entries(transportModes).map(([key, mode]) => (
-                      <option key={key} value={key}>{mode.name}</option>
-                    ))}
-                  </select>
-                  <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '12px' }}>{transportModes[transportMode].description}</div>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>Transport cost savings</h3>
+                  <div style={{ fontSize: '12px', color: '#4b5563', padding: '8px', background: '#e0f2fe', borderRadius: '4px', marginBottom: '12px', lineHeight: '1.5' }}>
+                    <strong>How this works:</strong> Without a chiller, farmers in remote areas typically make {currentContext.baselineTripsPerDay} trips per day to collection points (morning + evening). With a chiller, evening milk can be stored and delivered with the morning milk, reducing trips to {currentContext.reducedTripsPerDay} per day. Annual trips saved: <strong>{Math.round((currentContext.baselineTripsPerDay - currentContext.reducedTripsPerDay) * 365)}</strong>.
+                  </div>
                   
                   <SliderControl
-                    label="Transport cost per trip"
+                    label="Cost per trip to collection point"
                     value={transportCostPerTrip}
                     onChange={setTransportCostPerTrip}
                     min={0}
                     max={4.00}
                     step={0.25}
                     unit=" USD"
+                    helpText="Walking = $0 | Bicycle ~$0.50-1.00 | Motorcycle hire ~$1.50-2.50"
                   />
+                  
+                  <div style={{ padding: '12px', background: 'white', borderRadius: '4px', border: '1px solid #e5e7eb', fontSize: '12px', marginTop: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span>Trips saved per year:</span>
+                      <span style={{ fontWeight: '500' }}>{Math.round((currentContext.baselineTripsPerDay - currentContext.reducedTripsPerDay) * 365)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', color: '#16a34a' }}>
+                      <span>Annual transport savings:</span>
+                      <span>${Math.round((currentContext.baselineTripsPerDay - currentContext.reducedTripsPerDay) * 365 * transportCostPerTrip)}</span>
+                    </div>
+                  </div>
 
                   <div style={{ marginTop: '16px', padding: '12px', background: '#e0e7ff', borderRadius: '4px', fontSize: '12px' }}>
                     <div style={{ fontWeight: '600', marginBottom: '4px' }}>Context-suggested values:</div>
@@ -1167,6 +1043,12 @@
                     <strong>⚠️ Reliability concern:</strong> At {technologyReliability}% reliability, benefits are significantly reduced. Consider investigating infrastructure constraints (power, maintenance access) before investing.
                   </div>
                 )}
+
+                {chiller50Economics.eveningMilkIncome < 0 && (
+                  <div className="error-box">
+                    <strong>⛔ Negative evening milk value:</strong> The "with chiller" monetization rate ({eveningMonetizationWithChiller}%) combined with current prices results in LESS evening milk income than baseline. Increase monetization rate or check price assumptions.
+                  </div>
+                )}
                 
                 <p style={{ fontSize: '13px', color: '#4b5563', marginBottom: '12px', lineHeight: '1.5' }}>
                   Each chart shows annual costs (capital + maintenance) offset by income gains and savings. Net benefit (green = positive, red = negative) indicates annual economic value.
@@ -1180,7 +1062,11 @@
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ width: '14px', height: '14px', background: '#22c55e' }}></div>
-                    <span>Evening milk</span>
+                    <span>Evening milk (+)</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ width: '14px', height: '14px', background: '#ef4444' }}></div>
+                    <span>Evening milk (-)</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ width: '14px', height: '14px', background: '#8b5cf6' }}></div>
@@ -1193,14 +1079,6 @@
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ width: '14px', height: '14px', background: '#06b6d4' }}></div>
                     <span>Transport</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <div style={{ width: '14px', height: '14px', background: '#16a34a' }}></div>
-                    <span>Positive ROI</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <div style={{ width: '14px', height: '14px', background: '#dc2626' }}></div>
-                    <span>Negative ROI</span>
                   </div>
                 </div>
 
@@ -1230,7 +1108,12 @@
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Capital (annual):</span><span style={{ fontWeight: '500' }}>${Math.round(economics.annualCapital)}</span></div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Maintenance:</span><span style={{ fontWeight: '500' }}>${Math.round(economics.maintenance)}</span></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Evening milk income:</span><span style={{ fontWeight: '500', color: '#16a34a' }}>+${Math.round(economics.eveningMilkIncome)}</span></div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Evening milk income:</span>
+                            <span style={{ fontWeight: '500', color: economics.eveningMilkIncome >= 0 ? '#16a34a' : '#dc2626' }}>
+                              {economics.eveningMilkIncome >= 0 ? '+' : ''}${Math.round(economics.eveningMilkIncome)}
+                            </span>
+                          </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Quality premium:</span><span style={{ fontWeight: '500', color: '#7c3aed' }}>+${Math.round(economics.qualityPremiumIncome)}</span></div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Spoilage savings:</span><span style={{ fontWeight: '500', color: '#2563eb' }}>+${Math.round(economics.spoilageSavings)}</span></div>
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Transport savings:</span><span style={{ fontWeight: '500', color: '#0891b2' }}>+${Math.round(economics.transportSavings)}</span></div>
@@ -1238,7 +1121,7 @@
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600' }}>
                               <span>Net annual benefit:</span>
                               <span style={{ color: economics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>
-                                {economics.netBenefit >= 0 ? '+' : '-'}${Math.abs(Math.round(economics.netBenefit))}
+                                {economics.netBenefit >= 0 ? '+' : ''}${Math.round(economics.netBenefit)}
                               </span>
                             </div>
                             {ownershipModel === 'shared' && (
@@ -1251,7 +1134,7 @@
                               <span>ROI:</span>
                               <span style={{ color: economics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>{Math.round(economics.roi)}%</span>
                             </div>
-                            {economics.yearsToRepay && economics.yearsToRepay < 15 && (
+                            {economics.yearsToRepay && economics.yearsToRepay > 0 && economics.yearsToRepay < 15 && (
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                 <span>Payback:</span>
                                 <span style={{ color: economics.yearsToRepay <= 5 ? '#16a34a' : '#f59e0b' }}>{economics.yearsToRepay.toFixed(1)} yrs</span>
@@ -1278,7 +1161,7 @@
                       • {currentContext.baselineEveningMonetization}% sold locally @ ${localRetailPrice.toFixed(2)}/L<br/>
                       • {100 - currentContext.baselineEveningMonetization}% consumed/lost
                     </div>
-                    <div><strong>Cooperative price:</strong> ${milkPrice.toFixed(2)}/L ({countryPresets[country].name})</div>
+                    <div><strong>Cooperative price:</strong> ${milkPrice.toFixed(2)}/L</div>
                     <div><strong>Baseline spoilage:</strong> {baselineSpoilageRate}%</div>
                   </div>
                 </div>
@@ -1297,11 +1180,11 @@
                     <div><strong>Effective spoilage reduction:</strong> {recommendedEconomics.effectiveSpoilageReduction.toFixed(0)}%</div>
                     <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: `1px solid ${recommendedEconomics.netBenefit >= 0 ? '#22c55e' : '#dc2626'}`, fontWeight: '600', fontSize: '13px' }}>
                       <div><strong>Net annual benefit:</strong> <span style={{ color: recommendedEconomics.netBenefit >= 0 ? '#16a34a' : '#dc2626' }}>
-                        {recommendedEconomics.netBenefit >= 0 ? '+' : '-'}${Math.abs(Math.round(recommendedEconomics.netBenefit))}
+                        {recommendedEconomics.netBenefit >= 0 ? '+' : ''}${Math.round(recommendedEconomics.netBenefit)}
                       </span>
                       {ownershipModel === 'shared' && <span style={{ fontWeight: '400', fontSize: '11px' }}> (${Math.round(recommendedEconomics.perFarmerNetBenefit)}/farmer)</span>}
                       </div>
-                      {recommendedEconomics.yearsToRepay && recommendedEconomics.yearsToRepay < 15 && (
+                      {recommendedEconomics.yearsToRepay && recommendedEconomics.yearsToRepay > 0 && recommendedEconomics.yearsToRepay < 15 && (
                         <div><strong>Payback period:</strong> {recommendedEconomics.yearsToRepay.toFixed(1)} years</div>
                       )}
                     </div>
