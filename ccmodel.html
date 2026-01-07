@@ -183,44 +183,65 @@
           };
           
           // Affordability check
-          const checkAffordability = (monthlyPayment, depositRequired, techName) => {
+          const checkAffordability = (monthlyPayment, depositRequired, techName, totalCost) => {
             const issues = [];
-            const paymentToIncomeRatio = (monthlyPayment / monthlyHouseholdIncome) * 100;
             
-            if (paymentToIncomeRatio > 15) {
-              issues.push({ 
-                severity: 'error', 
-                message: `${techName}: Monthly payment (${paymentToIncomeRatio.toFixed(0)}% of income) exceeds safe threshold of 15%. High default risk.` 
-              });
-            } else if (paymentToIncomeRatio > 10) {
-              issues.push({ 
-                severity: 'warning', 
-                message: `${techName}: Monthly payment (${paymentToIncomeRatio.toFixed(0)}% of income) is moderately high. May strain household budget.` 
-              });
+            if (paymentMethod === 'upfront') {
+              // For upfront, check if total cost is affordable relative to income
+              const monthsOfIncome = totalCost / monthlyHouseholdIncome;
+              if (monthsOfIncome > 3) {
+                issues.push({ 
+                  severity: 'error', 
+                  message: `${techName}: Upfront cost ($${Math.round(totalCost)}) exceeds 3 months income. Major access barrier without financing.` 
+                });
+              } else if (monthsOfIncome > 1.5) {
+                issues.push({ 
+                  severity: 'warning', 
+                  message: `${techName}: Upfront cost ($${Math.round(totalCost)}) exceeds 1.5 months income. May require savings program.` 
+                });
+              }
+            } else {
+              // For financing/PAYG, check monthly payments
+              const paymentToIncomeRatio = (monthlyPayment / monthlyHouseholdIncome) * 100;
+              
+              if (paymentToIncomeRatio > 15) {
+                issues.push({ 
+                  severity: 'error', 
+                  message: `${techName}: Monthly payment (${paymentToIncomeRatio.toFixed(0)}% of income) exceeds safe threshold of 15%. High default risk.` 
+                });
+              } else if (paymentToIncomeRatio > 10) {
+                issues.push({ 
+                  severity: 'warning', 
+                  message: `${techName}: Monthly payment (${paymentToIncomeRatio.toFixed(0)}% of income) is moderately high. May strain household budget.` 
+                });
+              }
+              
+              // Check deposit for financing
+              if (paymentMethod === 'financing' && depositRequired > 0) {
+                if (depositRequired > monthlyHouseholdIncome * 1.5) {
+                  issues.push({ 
+                    severity: 'error', 
+                    message: `${techName}: Deposit ($${Math.round(depositRequired)}) exceeds 1.5 months income. Major access barrier.` 
+                  });
+                } else if (depositRequired > monthlyHouseholdIncome * 0.5) {
+                  issues.push({ 
+                    severity: 'warning', 
+                    message: `${techName}: Deposit ($${Math.round(depositRequired)}) exceeds half a month's income. May require savings program.` 
+                  });
+                }
+              }
             }
             
-            if (depositRequired > monthlyHouseholdIncome * 1.5) {
-              issues.push({ 
-                severity: 'error', 
-                message: `${techName}: Deposit ($${Math.round(depositRequired)}) exceeds 1.5 months income. Major access barrier.` 
-              });
-            } else if (depositRequired > monthlyHouseholdIncome * 0.5) {
-              issues.push({ 
-                severity: 'warning', 
-                message: `${techName}: Deposit ($${Math.round(depositRequired)}) exceeds half a month's income. May require savings program.` 
-              });
-            }
-            
-            return { issues, paymentToIncomeRatio };
+            return { issues };
           };
           
           const icsFinancing = calculateFinancingDetails('ics');
           const lpgFinancing = calculateFinancingDetails('lpg');
           const solarFinancing = calculateFinancingDetails('solar');
           
-          const icsAffordability = checkAffordability(icsFinancing.monthlyPayment, icsFinancing.depositRequired, 'ICS');
-          const lpgAffordability = checkAffordability(lpgFinancing.monthlyPayment, lpgFinancing.depositRequired, 'LPG');
-          const solarAffordability = checkAffordability(solarFinancing.monthlyPayment, solarFinancing.depositRequired, 'Solar');
+          const icsAffordability = checkAffordability(icsFinancing.monthlyPayment, icsFinancing.depositRequired, 'ICS', icsFinancing.totalCost);
+          const lpgAffordability = checkAffordability(lpgFinancing.monthlyPayment, lpgFinancing.depositRequired, 'LPG', lpgFinancing.totalCost);
+          const solarAffordability = checkAffordability(solarFinancing.monthlyPayment, solarFinancing.depositRequired, 'Solar', solarFinancing.totalCost);
           
           const allAffordabilityIssues = [
             ...icsAffordability.issues,
@@ -644,8 +665,8 @@
                         value={monthlyHouseholdIncome}
                         onChange={setMonthlyHouseholdIncome}
                         min={30}
-                        max={300}
-                        step={5}
+                        max={600}
+                        step={10}
                         unit=" USD"
                         helpText="Used for affordability analysis"
                       />
@@ -723,7 +744,7 @@
                     </div>
 
                     {/* Affordability alerts */}
-                    {paymentMethod !== 'upfront' && allAffordabilityIssues.length > 0 && (
+                    {allAffordabilityIssues.length > 0 && (
                       <div style={{ marginTop: '12px' }}>
                         {allAffordabilityIssues.map((issue, idx) => (
                           <div key={idx} className={issue.severity === 'error' ? 'error-box' : 'warning-box'} style={{ marginBottom: '8px' }}>
@@ -732,9 +753,9 @@
                         ))}
                       </div>
                     )}
-                    {paymentMethod !== 'upfront' && allAffordabilityIssues.length === 0 && (
+                    {allAffordabilityIssues.length === 0 && (
                       <div className="success-box" style={{ marginTop: '12px' }}>
-                        <strong>✓ Affordability check passed:</strong> All monthly payments are within sustainable range relative to household income.
+                        <strong>✓ Affordability check passed:</strong> {paymentMethod === 'upfront' ? 'Upfront costs are within sustainable range relative to household income.' : 'All monthly payments are within sustainable range relative to household income.'}
                       </div>
                     )}
                   </div>
