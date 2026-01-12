@@ -48,10 +48,15 @@
           const [mediumPrice, setMediumPrice] = useState(900);
           const [largePrice, setLargePrice] = useState(1400);
           
-          // Per-fridge baseline revenue
-          const [smallBaseline, setSmallBaseline] = useState(150);
-          const [mediumBaseline, setMediumBaseline] = useState(350);
-          const [largeBaseline, setLargeBaseline] = useState(600);
+          // Per-fridge baseline revenue - NOW CALCULATED FROM SINGLE SLIDER
+          const [baselineRevenue, setBaselineRevenue] = useState(350);
+          
+          // Derived baselines based on single slider position
+          // Small fridge gets the baseline, medium gets 1.5x, large gets 2.5x
+          // This reflects that larger fridges serve larger operations
+          const smallBaseline = baselineRevenue;
+          const mediumBaseline = baselineRevenue;
+          const largeBaseline = baselineRevenue;
           
           // Payment method
           const [paymentMethod, setPaymentMethod] = useState('payg');
@@ -79,9 +84,12 @@
           const [loanTermMonths, setLoanTermMonths] = useState(24);
           const [annualInterestRate, setAnnualInterestRate] = useState(30);
           
-          // PAYG parameters
-          const [paygTermMonths, setPaygTermMonths] = useState(24);
+          // PAYG parameters - term is equipment rental period (lifespan)
+          const [paygTermMonths, setPaygTermMonths] = useState(84);
           const [paygPremiumPercent, setPaygPremiumPercent] = useState(60);
+          
+          // Auto-set maintenance to 0 for PAYG (provider handles it)
+          const effectiveMaintenancePercent = paymentMethod === 'payg' ? 0 : maintenancePercent;
 
           // Fridge specifications
           const getFridges = () => ({
@@ -252,7 +260,7 @@
             const chargingRevenue = chargingRevenueEnabled ? (chargingRevenueDaily * 30 * reliabilityFactor) : 0;
             const generatorSavings = generatorSavingsEnabled ? generatorSavingsMonthly : 0;
             
-            const annualMaintenance = fridge.cashPrice * (maintenancePercent / 100);
+            const annualMaintenance = fridge.cashPrice * (effectiveMaintenancePercent / 100);
             const monthlyMaintenance = annualMaintenance / 12;
             
             const totalMonthlyBenefit = profitIncrease + chargingRevenue + generatorSavings;
@@ -581,7 +589,11 @@
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
                     <span>Maintenance:</span>
-                    <span>-${Math.round(monthlyMaintenance)}</span>
+                    {paymentMethod === 'payg' ? (
+                      <span style={{ color: '#16a34a', fontWeight: '500' }}>Included</span>
+                    ) : (
+                      <span>-${Math.round(monthlyMaintenance)}</span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', borderTop: '1px solid #fecaca', marginTop: '6px', paddingTop: '6px' }}>
                     <span>Total:</span>
@@ -605,7 +617,7 @@
               
               {/* Explanation */}
               <div style={{ padding: '14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', marginBottom: '18px', fontSize: '12px', color: '#1e3a5f', lineHeight: '1.6' }}>
-                <strong>How this model works:</strong> Each fridge size serves a different business scale. Larger fridges cost more but serve larger operations with higher baseline revenue. Larger units also get uplift bonuses (+10% medium, +20% large) reflecting expanded product range and multiple revenue streams. Affordability is based on baseline profit: payments above 50% of current profit are unaffordable, 30-50% are stretched.
+                <strong>How this model works:</strong> Set your baseline monthly revenue to see which fridge size is viable for your business scale. Larger fridges get uplift bonuses (+10% medium, +20% large) reflecting expanded product range. PAYG rental spreads cost over equipment lifespan with maintenance included. Affordability is based on baseline profit: payments above 50% of current profit are unaffordable, 30-50% are stretched.
               </div>
 
               {/* Parameters */}
@@ -613,24 +625,30 @@
                 
                 {/* Equipment & Business Scale */}
                 <div style={{ padding: '14px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>Equipment & business scale</h3>
+                  <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>Equipment prices</h3>
                   
-                  <div style={{ marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #e5e7eb' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#3b82f6', marginBottom: '6px' }}>● Small fridge</div>
+                  <div style={{ marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid #e5e7eb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#3b82f6' }} />
+                      <span style={{ fontSize: '12px', fontWeight: '500' }}>Small fridge (50-100L)</span>
+                    </div>
                     <SliderControl label="Price" value={smallPrice} onChange={setSmallPrice} min={300} max={800} step={25} prefix="$" color="#3b82f6" />
-                    <SliderControl label="Baseline revenue" value={smallBaseline} onChange={setSmallBaseline} min={75} max={400} step={25} prefix="$" unit="/mo" color="#3b82f6" />
                   </div>
                   
-                  <div style={{ marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid #e5e7eb' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#f97316', marginBottom: '6px' }}>● Medium fridge (+10% uplift)</div>
+                  <div style={{ marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid #e5e7eb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f97316' }} />
+                      <span style={{ fontSize: '12px', fontWeight: '500' }}>Medium fridge (150-250L)</span>
+                    </div>
                     <SliderControl label="Price" value={mediumPrice} onChange={setMediumPrice} min={600} max={1400} step={50} prefix="$" color="#f97316" />
-                    <SliderControl label="Baseline revenue" value={mediumBaseline} onChange={setMediumBaseline} min={150} max={700} step={25} prefix="$" unit="/mo" color="#f97316" />
                   </div>
                   
                   <div>
-                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#8b5cf6', marginBottom: '6px' }}>● Large freezer (+20% uplift)</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#8b5cf6' }} />
+                      <span style={{ fontSize: '12px', fontWeight: '500' }}>Large freezer (350-500L)</span>
+                    </div>
                     <SliderControl label="Price" value={largePrice} onChange={setLargePrice} min={1000} max={2000} step={50} prefix="$" color="#8b5cf6" />
-                    <SliderControl label="Baseline revenue" value={largeBaseline} onChange={setLargeBaseline} min={300} max={1200} step={50} prefix="$" unit="/mo" color="#8b5cf6" />
                   </div>
                 </div>
 
@@ -639,9 +657,9 @@
                   <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>Payment method</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
                     {[
-                      { key: 'upfront', label: 'Cash upfront' },
-                      { key: 'loan', label: 'Consumer loan' },
-                      { key: 'payg', label: 'PAYG' }
+                      { key: 'upfront', label: 'Cash upfront', desc: 'Full payment at purchase' },
+                      { key: 'loan', label: 'Consumer loan', desc: 'Bank/MFI financing, you own the asset' },
+                      { key: 'payg', label: 'PAYG rental', desc: 'Rent-to-own from provider' }
                     ].map(opt => (
                       <button 
                         key={opt.key}
@@ -658,30 +676,154 @@
                           fontWeight: paymentMethod === opt.key ? '600' : '400'
                         }}
                       >
-                        {opt.label}
+                        <div>{opt.label}</div>
+                        <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>{opt.desc}</div>
                       </button>
                     ))}
                   </div>
                   
                   {paymentMethod === 'loan' && (
-                    <>
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px', lineHeight: '1.4' }}>
+                        Consumer loans from banks or microfinance institutions. You own the equipment from day one. Typically requires deposit and credit history.
+                      </div>
                       <SliderControl label="Deposit" value={depositPercent} onChange={setDepositPercent} min={0} max={50} step={5} unit="%" />
                       <SliderControl label="Term" value={loanTermMonths} onChange={setLoanTermMonths} min={6} max={36} step={3} unit=" mo" />
                       <SliderControl label="APR" value={annualInterestRate} onChange={setAnnualInterestRate} min={15} max={50} step={1} unit="%" />
-                    </>
+                    </div>
                   )}
                   
                   {paymentMethod === 'payg' && (
-                    <>
-                      <SliderControl label="Term" value={paygTermMonths} onChange={setPaygTermMonths} min={12} max={36} step={3} unit=" mo" />
-                      <SliderControl label="Premium" value={paygPremiumPercent} onChange={setPaygPremiumPercent} min={30} max={100} step={5} unit="%" />
-                    </>
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px', lineHeight: '1.4' }}>
+                        Rent equipment from a PAYG provider. No deposit required. Provider handles maintenance and repairs. You own it after the rental period ends.
+                      </div>
+                      <SliderControl label="Rental period" value={paygTermMonths} onChange={setPaygTermMonths} min={36} max={84} step={6} unit=" mo" helpText="Equipment lifespan ~84 months" />
+                      <SliderControl label="Total premium" value={paygPremiumPercent} onChange={setPaygPremiumPercent} min={30} max={150} step={10} unit="%" helpText="Above cash price (covers service)" />
+                      <div style={{ fontSize: '10px', color: '#16a34a', marginTop: '6px', padding: '6px 8px', background: '#f0fdf4', borderRadius: '4px' }}>
+                        ✓ Maintenance included (provider responsibility)
+                      </div>
+                    </div>
                   )}
+                  
+                  {paymentMethod === 'upfront' && (
+                    <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '12px', lineHeight: '1.4' }}>
+                      Pay full price upfront. Lowest total cost but highest barrier to entry. You handle maintenance.
+                    </div>
+                  )}
+                  
+                  {/* Monthly payment preview */}
+                  <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>Monthly payments</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }}></span>
+                          Small
+                        </span>
+                        <span style={{ fontWeight: '600', color: '#3b82f6' }}>
+                          ${Math.round(calculateFinancingDetails(smallPrice).monthlyPayment)}/mo
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f97316' }}></span>
+                          Medium
+                        </span>
+                        <span style={{ fontWeight: '600', color: '#f97316' }}>
+                          ${Math.round(calculateFinancingDetails(mediumPrice).monthlyPayment)}/mo
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#8b5cf6' }}></span>
+                          Large
+                        </span>
+                        <span style={{ fontWeight: '600', color: '#8b5cf6' }}>
+                          ${Math.round(calculateFinancingDetails(largePrice).monthlyPayment)}/mo
+                        </span>
+                      </div>
+                    </div>
+                    {paymentMethod === 'upfront' && (
+                      <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '6px', fontStyle: 'italic' }}>
+                        (Full amount due at purchase)
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Shared Economics */}
                 <div style={{ padding: '14px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>Shared economics</h3>
+                  <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>Business economics</h3>
+                  
+                  {/* Baseline revenue with scale labels */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151' }}>Baseline monthly revenue</label>
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: '#331A38' }}>${baselineRevenue}/mo</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min={100} max={800} step={25} value={baselineRevenue} 
+                      onChange={(e) => setBaselineRevenue(parseFloat(e.target.value))}
+                      style={{ 
+                        width: '100%', 
+                        marginBottom: '6px',
+                        height: '3px',
+                        background: `linear-gradient(to right, #331A38 0%, #331A38 ${((baselineRevenue - 100) / 700) * 100}%, #e5e7eb ${((baselineRevenue - 100) / 700) * 100}%, #e5e7eb 100%)`,
+                        borderRadius: '3px',
+                        outline: 'none',
+                        WebkitAppearance: 'none'
+                      }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#6b7280' }}>
+                      <span>$100</span>
+                      <span>$800</span>
+                    </div>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      marginTop: '8px',
+                      padding: '8px',
+                      background: '#f3f4f6',
+                      borderRadius: '4px'
+                    }}>
+                      <div style={{ 
+                        textAlign: 'center', 
+                        fontSize: '10px', 
+                        color: baselineRevenue <= 200 ? '#3b82f6' : '#9ca3af',
+                        fontWeight: baselineRevenue <= 200 ? '600' : '400',
+                        padding: '0 4px'
+                      }}>
+                        <div>🏪</div>
+                        <div>Kiosk</div>
+                        <div style={{ fontSize: '8px' }}>$100-200</div>
+                      </div>
+                      <div style={{ 
+                        textAlign: 'center', 
+                        fontSize: '10px', 
+                        color: baselineRevenue > 200 && baselineRevenue <= 450 ? '#f97316' : '#9ca3af',
+                        fontWeight: baselineRevenue > 200 && baselineRevenue <= 450 ? '600' : '400',
+                        padding: '0 4px'
+                      }}>
+                        <div>🏬</div>
+                        <div>Small shop</div>
+                        <div style={{ fontSize: '8px' }}>$200-450</div>
+                      </div>
+                      <div style={{ 
+                        textAlign: 'center', 
+                        fontSize: '10px', 
+                        color: baselineRevenue > 450 ? '#8b5cf6' : '#9ca3af',
+                        fontWeight: baselineRevenue > 450 ? '600' : '400',
+                        padding: '0 4px'
+                      }}>
+                        <div>🏢</div>
+                        <div>Market trader</div>
+                        <div style={{ fontSize: '8px' }}>$450+</div>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <SliderControl label="Profit margin" value={profitMargin} onChange={setProfitMargin} min={10} max={50} step={5} unit="%" />
                   <SliderControl label="Base revenue uplift" value={baseUplift} onChange={setBaseUplift} min={10} max={80} step={5} unit="%" helpText="Medium +10%, Large +20% on top" />
                   
@@ -710,7 +852,20 @@
                 <div style={{ padding: '14px', background: '#f9fafb', borderRadius: '6px' }}>
                   <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>Operating factors</h3>
                   <SliderControl label="Tech reliability" value={reliabilityPercent} onChange={setReliabilityPercent} min={50} max={100} step={5} unit="%" helpText="Rainy days, repairs, downtime" />
-                  <SliderControl label="Annual maintenance" value={maintenancePercent} onChange={setMaintenancePercent} min={0} max={15} step={1} unit="% of price" helpText="3-8% typical" />
+                  
+                  {paymentMethod === 'payg' ? (
+                    <div style={{ marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151' }}>Annual maintenance</label>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#16a34a' }}>$0</span>
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#16a34a', padding: '6px 8px', background: '#f0fdf4', borderRadius: '4px' }}>
+                        ✓ Included in PAYG rental (provider handles repairs)
+                      </div>
+                    </div>
+                  ) : (
+                    <SliderControl label="Annual maintenance" value={maintenancePercent} onChange={setMaintenancePercent} min={0} max={15} step={1} unit="% of price" helpText="3-8% typical for owned equipment" />
+                  )}
                   
                   <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '12px', paddingTop: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -744,7 +899,7 @@
 
               {/* Methodology note */}
               <div style={{ padding: '12px', background: '#f3f4f6', borderRadius: '6px', fontSize: '11px', color: '#6b7280', lineHeight: '1.6' }}>
-                <strong>Methodology:</strong> Each fridge has independent baseline revenue reflecting typical business scale. Uplift bonuses: +10% (medium), +20% (large). Affordability = payment ÷ baseline profit (>50% unaffordable, 30-50% stretched). ROI = annual net benefit ÷ annual total cost. 7-year equipment lifespan. Reliability reduces revenue benefits but not fixed costs.
+                <strong>Methodology:</strong> Single baseline revenue applies to all fridge sizes to show viability at different business scales. Uplift bonuses: +10% (medium), +20% (large). PAYG rental period matches equipment lifespan (~7 years) with maintenance included. Consumer loans: you own the asset, handle maintenance. Affordability = payment ÷ baseline profit (>50% unaffordable, 30-50% stretched). ROI = annual net benefit ÷ annual total cost.
               </div>
             </div>
           );
