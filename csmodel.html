@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+  <html lang="en">
+    <head>
+    <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Cold Storage Facility Economic Impact Model</title>
+        <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+          <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+            <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+              <style>
+              * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; }
+                input[type="range"] { 
+                  width: 100%; 
+                  height: 3px; 
+                  background: #e5e7eb; 
+                    border-radius: 3px; 
+                  outline: none; 
+                  -webkit-appearance: none; 
+                }
+              input[type="range"]::-webkit-slider-thumb { 
+                -webkit-appearance: none; 
+                width: 15px; 
+                height: 15px; 
+                background: #fff;
+                  border: 2px solid #1e1e1e;
+                border-radius: 50%; 
+                cursor: pointer; 
+              }
+              input[type="range"]::-moz-range-thumb { 
+                width: 15px; 
+                height: 15px; 
+                background: #fff;
+                  border: 2px solid #1e1e1e;
+                border-radius: 50%; 
+                cursor: pointer; 
+              }
+              </style>
+                </head>
+                <body>
+                <div id="root"></div>
+                <script type="text/babel">
+                const { useState, useEffect, useRef } = React;
+              
+              function ColdStorageWidget() {
+                // Member count slider - much higher range based on evidence
+                const [memberCount, setMemberCount] = useState(80);
+                
+                // Facility prices (based on ColdHubs and similar data)
+                const [mobilePrice, setMobilePrice] = useState(8000);
+                const [smallPrice, setSmallPrice] = useState(20000);
+                const [largePrice, setLargePrice] = useState(40000);
+                
+                // Financing
+                const [subsidyPercent, setSubsidyPercent] = useState(50);
+                const [loanTermYears, setLoanTermYears] = useState(7);
+                const [annualInterestRate, setAnnualInterestRate] = useState(15);
+                
+                // Operating costs (monthly)
+                const [mobileOperatingCost, setMobileOperatingCost] = useState(50);
+                const [smallOperatingCost, setSmallOperatingCost] = useState(100);
+                const [largeOperatingCost, setLargeOperatingCost] = useState(150);
+                
+                // Usage fee per crate per day (ColdHubs charges $0.25-0.50)
+                const [usageFeePerCrateDay, setUsageFeePerCrateDay] = useState(0.25);
+                
+                // Farmer baseline parameters
+                const [monthlyProduceValue, setMonthlyProduceValue] = useState(150);
+                const [profitMargin, setProfitMargin] = useState(25);
+                const [baselineLossRate, setBaselineLossRate] = useState(25);
+                
+                // Usage parameters
+                const [percentProduceStored, setPercentProduceStored] = useState(50);
+                const [avgDaysStored, setAvgDaysStored] = useState(5);
+                
+                // Impact parameters
+                const [lossReduction, setLossReduction] = useState(13);
+                const [pricePremium, setPricePremium] = useState(20);
+                const [reliabilityPercent, setReliabilityPercent] = useState(85);
+                
+                // Constants
+                const PRICE_PER_KG = 1.50;
+                const KG_PER_CRATE = 20;
+                
+                // Derived calculations
+                const kgProducedMonthly = monthlyProduceValue / PRICE_PER_KG;
+                const kgStoredMonthly = kgProducedMonthly * (percentProduceStored / 100);
+                const cratesPerMemberMonthly = kgStoredMonthly / KG_PER_CRATE;
+                
+                // Facility specifications based on real-world data
+                // ColdHubs: $28,500-40,000 for 3-ton unit serving 50-200 users
+                // Mobile units: $5-15K serving 10-50 users
+                const getFacilities = () => ({
+                  mobile: {
+                    name: "Mobile cold unit",
+                    icon: "🚐",
+                    description: "Refrigerated van or portable container",
+                    price: mobilePrice,
+                    operatingCost: mobileOperatingCost,
+                    capacityTons: 1,
+                    optimalMembersMin: 15,
+                    optimalMembersMax: 50,
+                    lifespan: 7,
+                    color: "#3b82f6",
+                    useCase: "Last-mile delivery, fishing communities, remote farm clusters"
+                  },
+                  small: {
+                    name: "Walk-in cold room",
+                    icon: "🏠",
+                    description: "3-5 ton solar-powered unit (ColdHubs model)",
+                    price: smallPrice,
+                    operatingCost: smallOperatingCost,
+                    capacityTons: 3,
+                    optimalMembersMin: 40,
+                    optimalMembersMax: 150,
+                    lifespan: 10,
+                    color: "#f97316",
+                    useCase: "Village markets, farmer cooperatives, aggregation points"
+                  },
+                  large: {
+                    name: "Regional cold storage",
+                    icon: "🏭",
+                    description: "10-30 ton multi-zone facility",
+                    price: largePrice,
+                    operatingCost: largeOperatingCost,
+                    capacityTons: 10,
+                    optimalMembersMin: 100,
+                    optimalMembersMax: 300,
+                    lifespan: 15,
+                    color: "#8b5cf6",
+                    useCase: "Regional hubs, federation-level, wholesale markets"
+                  }
+                });
+                
+                const facilities = getFacilities();
+                
+                // Utilization status
+                const getUtilizationStatus = (facility) => {
+                  if (memberCount < facility.optimalMembersMin) {
+                    return {
+                      status: 'underutilized',
+                      label: 'Under-utilized',
+                      message: `${memberCount} members is below ${facility.optimalMembersMin} minimum. Fixed costs spread too thin.`,
+                      color: '#f59e0b',
+                      accessFactor: 1.0
+                    };
+                  }
+                  if (memberCount > facility.optimalMembersMax) {
+                    const accessFactor = Math.max(0.5, facility.optimalMembersMax / memberCount);
+                    return {
+                      status: 'overutilized',
+                      label: 'Over capacity',
+                      message: `${memberCount} members exceeds ${facility.optimalMembersMax} capacity. Storage access reduced to ${Math.round(accessFactor * 100)}%.`,
+                      color: '#ef4444',
+                      accessFactor: accessFactor
+                    };
+                  }
+                  return {
+                    status: 'optimal',
+                    label: 'Good fit',
+                    message: `${memberCount} members within optimal range (${facility.optimalMembersMin}-${facility.optimalMembersMax}).`,
+                    color: '#22c55e',
+                    accessFactor: 1.0
+                  };
+                };
+                
+                // Financing calculation
+                const calculateFinancing = (price) => {
+                  const subsidizedAmount = price * (subsidyPercent / 100);
+                  const loanAmount = price - subsidizedAmount;
+                  
+                  if (loanAmount <= 0) {
+                    return { subsidizedAmount, loanAmount: 0, monthlyLoanPayment: 0 };
+                  }
+                  
+                  const monthlyRate = annualInterestRate / 100 / 12;
+                  const numPayments = loanTermYears * 12;
+                  
+                  let monthlyPayment = 0;
+                  if (monthlyRate > 0 && numPayments > 0) {
+                    monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
+                  } else {
+                    monthlyPayment = loanAmount / numPayments;
+                  }
+                  
+                  return { subsidizedAmount, loanAmount, monthlyLoanPayment: monthlyPayment };
+                };
+                
+                // Viability assessment focused on sustainability
+                const getViabilityAssessment = (coopSustainable, sustainabilityGap, netMonthlyGain, incomeChangePercent) => {
+                  if (!coopSustainable && sustainabilityGap > 100) {
+                    return { 
+                      status: 'not_viable', 
+                      icon: '⛔', 
+                      label: 'Not viable', 
+                      explainer: `Facility loses $${Math.round(sustainabilityGap)}/mo. Needs more members or higher subsidy.`,
+                      bg: '#fee2e2', 
+                      color: '#dc2626' 
+                    };
+                  }
+                  if (!coopSustainable) {
+                    return { 
+                      status: 'marginal', 
+                      icon: '⚠️', 
+                      label: 'Needs support', 
+                      explainer: `Facility needs $${Math.round(sustainabilityGap)}/mo additional funding.`,
+                      bg: '#fef3c7', 
+                      color: '#d97706' 
+                    };
+                  }
+                  if (incomeChangePercent >= 15) {
+                    return { 
+                      status: 'excellent', 
+                      icon: '✓✓', 
+                      label: 'Excellent', 
+                      explainer: `Sustainable facility with strong ${Math.round(incomeChangePercent)}% income uplift.`,
+                      bg: '#dcfce7', 
+                      color: '#15803d' 
+                    };
+                  }
+                  if (incomeChangePercent >= 5) {
+                    return { 
+                      status: 'good', 
+                      icon: '✓', 
+                      label: 'Good investment', 
+                      explainer: `Sustainable with ${Math.round(incomeChangePercent)}% income uplift.`,
+                      bg: '#dcfce7', 
+                      color: '#16a34a' 
+                    };
+                  }
+                  return { 
+                    status: 'viable', 
+                    icon: '○', 
+                    label: 'Viable', 
+                    explainer: 'Facility sustainable but modest farmer benefit.',
+                    bg: '#dbeafe', 
+                    color: '#1d4ed8' 
+                  };
+                };
+                
+                // Calculate metrics
+                const calculateMemberMetrics = (facilityKey) => {
+                  const facility = facilities[facilityKey];
+                  const financing = calculateFinancing(facility.price);
+                  const utilization = getUtilizationStatus(facility);
+                  const reliabilityFactor = reliabilityPercent / 100;
+                  
+                  // Baseline economics
+                  const baselineMonthlyRevenue = monthlyProduceValue * (1 - baselineLossRate / 100);
+                  const baselineMonthlyProfit = baselineMonthlyRevenue * (profitMargin / 100);
+                  
+                  // Storage usage
+                  const effectiveStorageAccess = utilization.accessFactor;
+                  const valueStored = monthlyProduceValue * (percentProduceStored / 100) * effectiveStorageAccess;
+                  
+                  // Crate calculations
+                  const kgStored = valueStored / PRICE_PER_KG;
+                  const cratesPerMonth = kgStored / KG_PER_CRATE;
+                  
+                  // Usage fees
+                  const monthlyUsageFees = cratesPerMonth * avgDaysStored * usageFeePerCrateDay;
+                  
+                  // Cooperative costs
+                  const coopTotalMonthlyCost = financing.monthlyLoanPayment + facility.operatingCost;
+                  const perMemberCoopCost = coopTotalMonthlyCost / memberCount;
+                  
+                  // Benefits
+                  const newLossRateStored = Math.max(baselineLossRate - lossReduction, 2);
+                  const lossReductionValue = valueStored * (lossReduction / 100) * reliabilityFactor * (profitMargin / 100);
+                  const pricePremiumValue = valueStored * (1 - newLossRateStored / 100) * (pricePremium / 100) * reliabilityFactor * (profitMargin / 100);
+                  
+                  const totalMonthlyBenefit = lossReductionValue + pricePremiumValue;
+                  const netMonthlyGain = totalMonthlyBenefit - monthlyUsageFees;
+                  
+                  // Income change
+                  const incomeChangePercent = baselineMonthlyProfit > 0 ? (netMonthlyGain / baselineMonthlyProfit) * 100 : 0;
+                  
+                  // Cooperative sustainability
+                  const totalMemberFees = monthlyUsageFees * memberCount;
+                  const coopSustainable = totalMemberFees >= coopTotalMonthlyCost;
+                  const sustainabilityGap = coopTotalMonthlyCost - totalMemberFees;
+                  const sustainabilitySurplus = totalMemberFees - coopTotalMonthlyCost;
+                  
+                  // 5-year value
+                  const fiveYearNetValue = (netMonthlyGain * 12) * 5;
+                  
+                  // ROI
+                  const annualCost = monthlyUsageFees * 12;
+                  const annualBenefit = totalMonthlyBenefit * 12;
+                  const roi = annualCost > 0 ? ((annualBenefit - annualCost) / annualCost) * 100 : (annualBenefit > 0 ? 999 : 0);
+                  
+                  const verdict = getViabilityAssessment(coopSustainable, sustainabilityGap, netMonthlyGain, incomeChangePercent);
+                  
+                  return {
+                    facilityKey, facility, financing, utilization, reliabilityFactor,
+                    baselineMonthlyProfit, effectiveStorageAccess, kgStored, cratesPerMonth,
+                    monthlyUsageFees, lossReductionValue, pricePremiumValue,
+                    totalMonthlyBenefit, netMonthlyGain, perMemberCoopCost, coopTotalMonthlyCost,
+                    incomeChangePercent, fiveYearNetValue, roi,
+                    verdict, coopSustainable, sustainabilityGap, sustainabilitySurplus, totalMemberFees
+                  };
+                };
+                
+                const allMetrics = {
+                  mobile: calculateMemberMetrics('mobile'),
+                  small: calculateMemberMetrics('small'),
+                  large: calculateMemberMetrics('large')
+                };
+                
+                // Best option
+                const viableOptions = Object.values(allMetrics).filter(m => 
+                                                                         m.coopSustainable && m.netMonthlyGain > 0 && m.utilization.status !== 'overutilized'
+                );
+                const bestOption = viableOptions.length > 0 
+                ? viableOptions.reduce((best, current) => 
+                                         current.incomeChangePercent > best.incomeChangePercent ? current : best
+                ).facilityKey 
+                : null;
+                
+                const SliderControl = ({ label, value, onChange, min, max, step = 1, unit = "", helpText = "", prefix = "" }) => {
+                  const sliderRef = useRef(null);
+                  
+                  useEffect(() => {
+                    if (sliderRef.current) {
+                      const percentage = ((value - min) / (max - min)) * 100;
+                      sliderRef.current.style.background = `linear-gradient(to right, #1e1e1e 0%, #1e1e1e ${percentage}%, #e5e7eb ${percentage}%, #e5e7eb 100%)`;
+                    }
+                  }, [value, min, max]);
+                  
+                  return (
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151' }}>{label}</label>
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: '#111827' }}>{prefix}{typeof value === 'number' && value >= 1000 ? value.toLocaleString() : value}{unit}</span>
+                      </div>
+                      {helpText && <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '5px', lineHeight: '1.4' }}>{helpText}</div>}
+                    <input ref={sliderRef} type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value))} />
+                      </div>
+                  );
+                };
+                
+                // Waterfall Chart
+                const WaterfallChart = ({ benefits, costs, netGain }) => {
+                  const maxVal = Math.max(Math.abs(benefits), Math.abs(costs), Math.abs(netGain), 1) * 1.2;
+                  const chartHeight = 70;
+                  const zeroLine = chartHeight / 2;
+                  const scale = (chartHeight / 2) / maxVal;
+                  const barWidth = 45;
+                  const gap = 15;
+                  
+                  const renderBar = (val, barColor, labelText, xPos, barLabel) => {
+                    const height = Math.max(Math.abs(val * scale), 2);
+                    const top = val >= 0 ? zeroLine - height : zeroLine;
+                    
+                    return (
+                      <div style={{ position: 'absolute', left: `${xPos}px` }}>
+                        <div style={{ 
+                          width: `${barWidth}px`, height: `${height}px`, position: 'absolute', top: `${top}px`,
+                          background: barColor, borderRadius: '3px'
+                        }}>
+                        <div style={{ 
+                          color: height > 14 ? 'white' : barColor, fontSize: '10px', fontWeight: '700',
+                          textAlign: 'center', position: height > 14 ? 'relative' : 'absolute',
+                          top: height > 14 ? '1px' : (val >= 0 ? '-13px' : `${height + 1}px`), width: '100%'
+                        }}>{labelText}</div>
+                        </div>
+                        <div style={{ fontSize: '9px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: `${chartHeight + 3}px`, color: '#6b7280' }}>{barLabel}</div>
+                        </div>
+                    );
+                  };
+                  
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      <div style={{ position: 'relative', width: `${barWidth * 3 + gap * 2}px`, height: `${chartHeight + 18}px` }}>
+                      <div style={{ position: 'absolute', width: '100%', borderTop: '1px solid #9ca3af', top: `${zeroLine}px` }} />
+                      {renderBar(benefits, '#22c55e', `+$${benefits.toFixed(2)}`, 0, 'Benefits')}
+                    {renderBar(-costs, '#ef4444', `-$${costs.toFixed(2)}`, barWidth + gap, 'Fees')}
+                    {renderBar(netGain, netGain >= 0 ? '#15803d' : '#dc2626', `${netGain >= 0 ? '+' : ''}$${netGain.toFixed(2)}`, (barWidth + gap) * 2, 'Net')}
+                    </div>
+                      </div>
+                  );
+                };
+                
+                // Outcome Card
+                const OutcomeCard = ({ metrics, isBest }) => {
+                  const { facility, utilization, monthlyUsageFees, lossReductionValue, pricePremiumValue,
+                    totalMonthlyBenefit, netMonthlyGain, incomeChangePercent, fiveYearNetValue,
+                    verdict, cratesPerMonth, kgStored, effectiveStorageAccess, coopSustainable,
+                    coopTotalMonthlyCost, totalMemberFees, sustainabilityGap, sustainabilitySurplus } = metrics;
+                  
+                  return (
+                    <div style={{ padding: '14px', background: 'white', border: `2px solid ${facility.color}`, borderRadius: '8px', position: 'relative' }}>
+                      {isBest && (
+                        <div style={{ position: 'absolute', top: '-10px', right: '12px', background: '#15803d', color: 'white', fontSize: '10px', fontWeight: '700', padding: '4px 10px', borderRadius: '10px' }}>BEST FIT</div>
+                      )}
+                    
+                    {/* Header */}
+                    <div style={{ marginBottom: '10px', paddingBottom: '8px', borderBottom: `2px solid ${facility.color}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                      <span style={{ fontSize: '18px' }}>{facility.icon}</span>
+                      <div style={{ fontWeight: '700', fontSize: '14px', color: '#1f2937' }}>{facility.name}</div>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#6b7280' }}>${facility.price.toLocaleString()} • {facility.optimalMembersMin}-{facility.optimalMembersMax} users optimal</div>
+                      </div>
+                      
+                      {/* Utilization */}
+                    {utilization.status !== 'optimal' && (
+                      <div style={{ padding: '8px', background: utilization.status === 'underutilized' ? '#fffbeb' : '#fef2f2', borderRadius: '4px', marginBottom: '10px', fontSize: '11px', color: utilization.color, fontWeight: '500' }}>
+                        ⚠ {utilization.label}: {utilization.message}
+                      </div>
+                    )}
+                    
+                    {/* Verdict */}
+                    <div style={{ padding: '10px', background: verdict.bg, borderRadius: '6px', marginBottom: '12px', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', color: verdict.color, marginBottom: '3px' }}>
+                      <span>{verdict.icon}</span><span>{verdict.label}</span>
+                      </div>
+                      <div style={{ fontSize: '10px', color: verdict.color, opacity: 0.9 }}>{verdict.explainer}</div>
+                      </div>
+                      
+                      {/* Facility sustainability */}
+                    <div style={{ padding: '10px', background: coopSustainable ? '#f0fdf4' : '#fef2f2', border: coopSustainable ? '1px solid #bbf7d0' : '2px solid #fecaca', borderRadius: '6px', marginBottom: '12px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: coopSustainable ? '#166534' : '#dc2626', marginBottom: '6px' }}>
+                      {coopSustainable ? '✓ Facility sustainable' : '⛔ Facility not sustainable'}
+                    </div>
+                      <div style={{ fontSize: '10px', color: '#6b7280' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                      <span>Monthly costs:</span><span>${Math.round(coopTotalMonthlyCost)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                      <span>Total user fees:</span><span>${Math.round(totalMemberFees)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', color: coopSustainable ? '#166534' : '#dc2626' }}>
+                      <span>{coopSustainable ? 'Surplus:' : 'Shortfall:'}</span>
+                      <span>{coopSustainable ? `+$${Math.round(sustainabilitySurplus)}` : `-$${Math.round(sustainabilityGap)}`}/mo</span>
+                      </div>
+                      </div>
+                      </div>
+                      
+                      {/* Farmer metrics */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                      <div style={{ background: '#f9fafb', padding: '8px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '2px' }}>Net monthly</div>
+                      <div style={{ fontSize: '18px', fontWeight: '700', color: netMonthlyGain >= 0 ? '#15803d' : '#dc2626' }}>
+                      {netMonthlyGain >= 0 ? '+' : ''}${netMonthlyGain.toFixed(2)}
+                    </div>
+                      </div>
+                      <div style={{ background: '#f9fafb', padding: '8px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '2px' }}>Income uplift</div>
+                      <div style={{ fontSize: '18px', fontWeight: '700', color: incomeChangePercent >= 0 ? '#15803d' : '#dc2626' }}>
+                      {incomeChangePercent >= 0 ? '+' : ''}{incomeChangePercent.toFixed(1)}%
+                    </div>
+                      </div>
+                      </div>
+                      
+                      {/* Waterfall */}
+                    <div style={{ marginBottom: '12px', padding: '8px', background: '#f9fafb', borderRadius: '6px' }}>
+                      <div style={{ fontSize: '10px', color: '#6b7280', textAlign: 'center', marginBottom: '4px' }}>Monthly per farmer</div>
+                      <WaterfallChart benefits={totalMonthlyBenefit} costs={monthlyUsageFees} netGain={netMonthlyGain} />
+                      </div>
+                      
+                      {/* Storage details */}
+                    <div style={{ fontSize: '11px', marginBottom: '10px', padding: '8px', background: '#f9fafb', borderRadius: '4px' }}>
+                      <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Storage per farmer</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                      <span style={{ color: '#6b7280' }}>Stored monthly:</span>
+                      <span>{Math.round(kgStored)} kg ({cratesPerMonth.toFixed(1)} crates)</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#6b7280' }}>Days × fee:</span>
+                      <span>{avgDaysStored}d × ${usageFeePerCrateDay}/crate</span>
+                      </div>
+                      {effectiveStorageAccess < 1 && (
+                        <div style={{ fontSize: '10px', color: '#dc2626', marginTop: '4px' }}>⚠ Access at {Math.round(effectiveStorageAccess * 100)}% due to crowding</div>
+                      )}
+                    </div>
+                      
+                      {/* Breakdown */}
+                    <div style={{ fontSize: '11px', padding: '8px', background: '#f0fdf4', borderRadius: '4px', marginBottom: '8px' }}>
+                      <div style={{ fontWeight: '600', color: '#166534', marginBottom: '4px' }}>Benefits</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                      <span>Loss reduction ({lossReduction}pp):</span><span>+${lossReductionValue.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Price premium ({pricePremium}%):</span><span>+${pricePremiumValue.toFixed(2)}</span>
+                      </div>
+                      </div>
+                      
+                      <div style={{ fontSize: '11px', padding: '8px', background: '#fef2f2', borderRadius: '4px' }}>
+                      <div style={{ fontWeight: '600', color: '#991b1b', marginBottom: '4px' }}>Costs</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Usage fees:</span><span>-${monthlyUsageFees.toFixed(2)}/mo</span>
+                      </div>
+                      </div>
+                      </div>
+                  );
+                };
+                
+                return (
+                  <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+                    {/* Header */}
+                  <div style={{ marginBottom: '20px' }}>
+                    <h1 style={{ fontSize: '22px', fontWeight: '700', marginBottom: '8px', color: '#1e1e1e' }}>
+                    🧊 Cold storage facility comparison model
+                  </h1>
+                    <p style={{ fontSize: '13px', color: '#6b7280', lineHeight: '1.6' }}>
+                    This model compares three cold storage facility types to identify which best matches a cooperative's size and economics. 
+                  It calculates two things: (1) whether each facility is financially sustainable from usage fees, and (2) the net income 
+                  change for individual farmers after accounting for storage fees. Adjust cooperative size, facility costs, subsidy levels, 
+                  farmer production scale, and expected impact factors to test different scenarios.
+                </p>
+              </div>
+
+              {/* Member count slider */}
+              <div style={{ padding: '14px', background: '#f8fafc', borderRadius: '8px', marginBottom: '16px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>Cooperative size (farmers using the facility)</label>
+                    <span style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>{memberCount} farmers</span>
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '8px' }}>
+                    Total storage demand: ~{Math.round(cratesPerMemberMonthly * memberCount)} crates/month ({Math.round(kgStoredMonthly * memberCount)} kg)
+                  </div>
+                    <input 
+                  type="range" min={10} max={250} step={10} value={memberCount} 
+                  onChange={(e) => setMemberCount(parseFloat(e.target.value))}
+                  style={{ 
+                    width: '100%', height: '5px',
+                    background: `linear-gradient(to right, #1e1e1e 0%, #1e1e1e ${((memberCount - 10) / 240) * 100}%, #e5e7eb ${((memberCount - 10) / 240) * 100}%, #e5e7eb 100%)`,
+                    borderRadius: '3px', outline: 'none', WebkitAppearance: 'none'
+                  }}
+                  />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '10px' }}>
+                    <div style={{ textAlign: 'center', padding: '4px 8px', background: memberCount <= 50 ? '#dbeafe' : '#f1f5f9', borderRadius: '4px', color: memberCount <= 50 ? '#1e40af' : '#94a3b8' }}>
+                    <div style={{ fontWeight: memberCount <= 50 ? '600' : '400' }}>Small (10-50)</div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: '4px 8px', background: memberCount > 50 && memberCount <= 120 ? '#fed7aa' : '#f1f5f9', borderRadius: '4px', color: memberCount > 50 && memberCount <= 120 ? '#c2410c' : '#94a3b8' }}>
+                    <div style={{ fontWeight: memberCount > 50 && memberCount <= 120 ? '600' : '400' }}>Medium (50-120)</div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: '4px 8px', background: memberCount > 120 ? '#e9d5ff' : '#f1f5f9', borderRadius: '4px', color: memberCount > 120 ? '#7c3aed' : '#94a3b8' }}>
+                    <div style={{ fontWeight: memberCount > 120 ? '600' : '400' }}>Large (120+)</div>
+                    </div>
+                    </div>
+                    </div>
+                    
+                    {/* Input panels */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                    
+                    {/* Facility costs */}
+                  <div style={{ padding: '14px', background: '#f9fafb', borderRadius: '6px' }}>
+                    <h3 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '10px', color: '#374151' }}>Facility equipment costs</h3>
+                    <SliderControl label="Mobile cold unit" value={mobilePrice} onChange={setMobilePrice} min={4000} max={15000} step={500} prefix="$" 
+                  helpText="Refrigerated van or portable container. 0.5-1 ton capacity. Best for remote areas or last-mile delivery." />
+                    <SliderControl label="Walk-in cold room" value={smallPrice} onChange={setSmallPrice} min={12000} max={30000} step={1000} prefix="$" 
+                  helpText="Solar-powered 3-5 ton unit (like ColdHubs). Standard village-level facility for markets or cooperatives." />
+                    <SliderControl label="Regional cold storage" value={largePrice} onChange={setLargePrice} min={25000} max={60000} step={2000} prefix="$" 
+                  helpText="10-30 ton multi-zone facility. For wholesale markets, federation hubs, or regional aggregation centers." />
+                    </div>
+                    
+                    {/* Subsidy and financing */}
+                  <div style={{ padding: '14px', background: '#faf5ff', borderRadius: '6px', border: '1px solid #e9d5ff' }}>
+                    <h3 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '10px', color: '#6b21a8' }}>Subsidy and financing</h3>
+                    
+                    <div style={{ marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151' }}>Grant/subsidy coverage</label>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#6b21a8' }}>{subsidyPercent}%</span>
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '5px' }}>
+                    Portion covered by grants. Remaining {100 - subsidyPercent}% financed via loans. Most cooperatives need 40-60% subsidy.
+                  </div>
+                    <input type="range" min={0} max={100} step={5} value={subsidyPercent} onChange={(e) => setSubsidyPercent(parseFloat(e.target.value))}
+                  style={{ width: '100%', height: '3px', background: `linear-gradient(to right, #1e1e1e 0%, #1e1e1e ${subsidyPercent}%, #e5e7eb ${subsidyPercent}%, #e5e7eb 100%)`, borderRadius: '3px', outline: 'none', WebkitAppearance: 'none' }} />
+                    </div>
+                    
+                    {subsidyPercent < 100 && (
+                      <>
+                        <SliderControl label="Loan term" value={loanTermYears} onChange={setLoanTermYears} min={3} max={10} step={1} unit=" years" helpText="Repayment period. Longer terms = lower monthly payments but more interest." />
+                        <SliderControl label="Interest rate" value={annualInterestRate} onChange={setAnnualInterestRate} min={5} max={25} step={1} unit="%" helpText="Microfinance: 15-25%. Development finance: 5-12%." />
+                        </>
+                    )}
+                  
+                  <SliderControl label="Usage fee" value={usageFeePerCrateDay} onChange={setUsageFeePerCrateDay} min={0.10} max={0.50} step={0.05} prefix="$" unit="/crate/day" 
+                  helpText="Fee per 20kg crate per day. ColdHubs charges $0.25-0.50. Primary revenue source for the facility." />
+                    </div>
+                    
+                    {/* Farmer baseline */}
+                  <div style={{ padding: '14px', background: '#f9fafb', borderRadius: '6px' }}>
+                    <h3 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '10px', color: '#374151' }}>Farmer production</h3>
+                    
+                    <div style={{ marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151' }}>Monthly produce value</label>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#111827' }}>${monthlyProduceValue}/mo</span>
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '5px' }}>
+                    Total harvest value. At ~$1.50/kg = {Math.round(kgProducedMonthly)} kg/month. Storing {percentProduceStored}% = {cratesPerMemberMonthly.toFixed(1)} crates.
+                  </div>
+                    <input type="range" min={50} max={500} step={25} value={monthlyProduceValue} onChange={(e) => setMonthlyProduceValue(parseFloat(e.target.value))}
+                  style={{ width: '100%', height: '3px', background: `linear-gradient(to right, #1e1e1e 0%, #1e1e1e ${((monthlyProduceValue - 50) / 450) * 100}%, #e5e7eb ${((monthlyProduceValue - 50) / 450) * 100}%, #e5e7eb 100%)`, borderRadius: '3px', outline: 'none', WebkitAppearance: 'none' }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', padding: '6px', background: '#fff', borderRadius: '4px', border: '1px solid #e5e7eb', fontSize: '9px' }}>
+                    <div style={{ textAlign: 'center', color: monthlyProduceValue <= 100 ? '#3b82f6' : '#9ca3af', fontWeight: monthlyProduceValue <= 100 ? '600' : '400' }}>🌱 Subsistence<br/>$50-100</div>
+                    <div style={{ textAlign: 'center', color: monthlyProduceValue > 100 && monthlyProduceValue <= 250 ? '#f97316' : '#9ca3af', fontWeight: monthlyProduceValue > 100 && monthlyProduceValue <= 250 ? '600' : '400' }}>🥬 Smallholder<br/>$100-250</div>
+                    <div style={{ textAlign: 'center', color: monthlyProduceValue > 250 ? '#8b5cf6' : '#9ca3af', fontWeight: monthlyProduceValue > 250 ? '600' : '400' }}>🚜 Commercial<br/>$250+</div>
+                    </div>
+                    </div>
+                    
+                    <SliderControl label="Profit margin" value={profitMargin} onChange={setProfitMargin} min={15} max={40} step={5} unit="%" helpText="Farmer profit as % of revenue after input costs. Smallholders typically 20-30%." />
+                    <SliderControl label="Baseline loss rate" value={baselineLossRate} onChange={setBaselineLossRate} min={15} max={40} step={5} unit="%" helpText="Post-harvest losses without cold storage. F&V in developing countries: 25-40%." />
+                    </div>
+                    
+                    {/* Usage and impact */}
+                  <div style={{ padding: '14px', background: '#f9fafb', borderRadius: '6px' }}>
+                    <h3 style={{ fontSize: '12px', fontWeight: '600', marginBottom: '10px', color: '#374151' }}>Storage usage and impact</h3>
+                    
+                    <SliderControl label="% of harvest stored" value={percentProduceStored} onChange={setPercentProduceStored} min={20} max={80} step={10} unit="%" 
+                  helpText={`Share needing cold storage. At ${percentProduceStored}%: ${Math.round(kgStoredMonthly)}kg = ${cratesPerMemberMonthly.toFixed(1)} crates/farmer/month.`} />
+                    <SliderControl label="Average storage days" value={avgDaysStored} onChange={setAvgDaysStored} min={2} max={10} step={1} unit=" days" 
+                  helpText="How long produce stays before sale. Longer = higher fees but potentially better prices." />
+                    
+                    <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '10px', paddingTop: '10px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Expected impact (evidence-based)</div>
+                    <SliderControl label="Loss reduction" value={lossReduction} onChange={setLossReduction} min={5} max={20} step={1} unit=" pp" 
+                  helpText="China study: 13.2pp average. Nigeria: 4.7-11.2pp. Varies by produce type and handling." />
+                    <SliderControl label="Price premium" value={pricePremium} onChange={setPricePremium} min={10} max={50} step={5} unit="%" 
+                  helpText="Higher prices for fresher produce. Evidence: 15-20% (Nigeria), 50% (Kenya UNEP), 84% (fish)." />
+                    <SliderControl label="Reliability" value={reliabilityPercent} onChange={setReliabilityPercent} min={60} max={95} step={5} unit="%" 
+                  helpText="System uptime accounting for repairs, power issues. Solar systems typically 80-90%." />
+                    </div>
+                    </div>
+                    </div>
+                    
+                    {/* Storage summary */}
+                  <div style={{ padding: '10px 12px', background: '#fffbeb', borderRadius: '6px', marginBottom: '16px', border: '1px solid #fde68a', fontSize: '11px', color: '#92400e' }}>
+                    <strong>Storage demand:</strong> Each farmer produces ~{Math.round(kgProducedMonthly)}kg/month (${monthlyProduceValue}). 
+                  Storing {percentProduceStored}% = <strong>{cratesPerMemberMonthly.toFixed(1)} crates/farmer</strong>. 
+                  With {memberCount} farmers: <strong>{Math.round(cratesPerMemberMonthly * memberCount)} crates/month total</strong> ({Math.round(kgStoredMonthly * memberCount)}kg).
+                  </div>
+                    
+                    {/* Outcomes */}
+                  <h2 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>Outcomes by facility type</h2>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+                    <OutcomeCard metrics={allMetrics.mobile} isBest={bestOption === 'mobile'} />
+                    <OutcomeCard metrics={allMetrics.small} isBest={bestOption === 'small'} />
+                    <OutcomeCard metrics={allMetrics.large} isBest={bestOption === 'large'} />
+                    </div>
+                    
+                    {/* No viable warning */}
+                  {!bestOption && (
+                    <div style={{ padding: '12px', background: '#fef2f2', borderRadius: '6px', marginBottom: '16px', border: '1px solid #fecaca', fontSize: '11px', color: '#dc2626' }}>
+                      <strong>⚠ No sustainable option found with current settings.</strong> Try: increasing subsidy %, adding more members, raising usage fees, or selecting farmers with higher production.
+                    </div>
+                  )}
+                  
+                  {/* Methodology */}
+                  <div style={{ padding: '12px', background: '#f3f4f6', borderRadius: '6px', fontSize: '10px', color: '#6b7280', lineHeight: '1.5' }}>
+                    <strong>Methodology:</strong> Farmer benefits = (loss reduction + price premium) × profit margin × reliability factor. Costs = crates × days × fee rate. 
+                  Facility sustainable when: total user fees ≥ (loan payments + operating costs). Under-utilized = high per-user costs; over-capacity = reduced storage access.
+                  <br/><br/>
+                    <strong>Evidence:</strong> Li et al. (2025) China: 13.2pp loss reduction; Takeshima et al. (2023) Nigeria: 4.7-11.2pp loss reduction, 15-20% price premium; 
+                  ColdHubs: $28,500-40,000 per 3-ton unit serving 50-200 users; UNEP Kenya: 50% income increase; KeepITCool: 84% fish price increase.
+                  </div>
+                    </div>
+                );
+              }
+              
+              const root = ReactDOM.createRoot(document.getElementById('root'));
+              root.render(<ColdStorageWidget />);
+              </script>
+                </body>
+                </html>
