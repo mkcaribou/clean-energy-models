@@ -9,10 +9,10 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; font-size: 15px; }
         input[type="range"] { 
             width: 100%; 
-            height: 3px; 
+            height: 5px; 
             background: #e5e7eb; 
             border-radius: 3px; 
             outline: none; 
@@ -20,18 +20,18 @@
         }
         input[type="range"]::-webkit-slider-thumb { 
             -webkit-appearance: none; 
-            width: 15px; 
-            height: 15px; 
+            width: 20px; 
+            height: 20px; 
             background: #fff;
-            border: 2px solid #331A38;
+            border: 3px solid #1e1e1e;
             border-radius: 50%; 
             cursor: pointer; 
         }
         input[type="range"]::-moz-range-thumb { 
-            width: 15px; 
-            height: 15px; 
+            width: 20px; 
+            height: 20px; 
             background: #fff;
-            border: 2px solid #331A38;
+            border: 3px solid #1e1e1e;
             border-radius: 50%; 
             cursor: pointer; 
         }
@@ -48,12 +48,10 @@
           const [mediumPrice, setMediumPrice] = useState(900);
           const [largePrice, setLargePrice] = useState(1400);
           
-          // Per-fridge baseline revenue - NOW CALCULATED FROM SINGLE SLIDER
+          // Per-fridge baseline revenue
           const [baselineRevenue, setBaselineRevenue] = useState(350);
           
-          // Derived baselines based on single slider position
-          // Small fridge gets the baseline, medium gets 1.5x, large gets 2.5x
-          // This reflects that larger fridges serve larger operations
+          // Derived baselines
           const smallBaseline = baselineRevenue;
           const mediumBaseline = baselineRevenue;
           const largeBaseline = baselineRevenue;
@@ -84,11 +82,11 @@
           const [loanTermMonths, setLoanTermMonths] = useState(24);
           const [annualInterestRate, setAnnualInterestRate] = useState(30);
           
-          // PAYG parameters - term is equipment rental period (lifespan)
+          // PAYG parameters
           const [paygTermMonths, setPaygTermMonths] = useState(84);
           const [paygPremiumPercent, setPaygPremiumPercent] = useState(60);
           
-          // Auto-set maintenance to 0 for PAYG (provider handles it)
+          // Auto-set maintenance to 0 for PAYG
           const effectiveMaintenancePercent = paymentMethod === 'payg' ? 0 : maintenancePercent;
 
           // Fridge specifications
@@ -191,7 +189,7 @@
             };
           };
 
-          // Affordability check - based on baseline business profit
+          // Affordability check
           const checkAffordability = (monthlyPayment, depositRequired, totalCapital, baselineProfit) => {
             if (paymentMethod === 'upfront') {
               const monthsOfProfit = totalCapital / baselineProfit;
@@ -220,7 +218,7 @@
             return 'viable';
           };
           
-          // Combined verdict with explainers
+          // Combined verdict
           const getVerdict = (affordability, viability) => {
             if (viability === 'not_viable') {
               return { status: 'error', icon: '⛔', label: 'Not viable', explainer: 'Costs exceed benefits', bg: '#fee2e2', color: '#dc2626' };
@@ -317,7 +315,7 @@
             large: calculateMetricsForFridge('large')
           };
           
-          // Best option - highest ROI among viable options
+          // Best option
           const goodOptions = Object.values(allMetrics).filter(m => 
             m.verdict.status === 'success' || (m.verdict.status === 'warning' && m.viability !== 'not_viable')
           );
@@ -325,7 +323,7 @@
             ? goodOptions.reduce((best, current) => current.roi > best.roi ? current : best).fridgeKey 
             : null;
 
-          const SliderControl = ({ label, value, onChange, min, max, step = 1, unit = "", helpText = "", prefix = "", color = "#331A38" }) => {
+          const SliderControl = ({ label, value, onChange, min, max, step = 1, unit = "", helpText = "", prefix = "", color = "#1e1e1e" }) => {
             const sliderRef = useRef(null);
             
             useEffect(() => {
@@ -337,12 +335,12 @@
             }, [value, color, min, max]);
             
             return (
-              <div style={{ marginBottom: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151' }}>{label}</label>
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: color || '#111827' }}>{prefix}{value}{unit}</span>
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>{label}</label>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: color || '#111827' }}>{prefix}{value}{unit}</span>
                 </div>
-                {helpText && <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '4px', fontStyle: 'italic' }}>{helpText}</div>}
+                {helpText && <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>{helpText}</div>}
                 <input 
                   ref={sliderRef}
                   type="range" 
@@ -353,7 +351,7 @@
             );
           };
 
-          // Waterfall Chart Component - consistent colors throughout
+          // Waterfall Chart Component
           const WaterfallChart = ({ benefits, costs, netGain }) => {
             const values = [benefits, costs, netGain];
             const maxVal = Math.max(...values.map(v => Math.abs(v)), 1) * 1.2;
@@ -393,7 +391,7 @@
                       {labelText}
                     </div>
                   </div>
-                  <div style={{ fontSize: '10px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: `${chartHeight + 6}px`, color: '#6b7280', fontWeight: '500' }}>
+                  <div style={{ fontSize: '11px', textAlign: 'center', width: `${barWidth}px`, position: 'absolute', top: `${chartHeight + 6}px`, color: '#6b7280', fontWeight: '500' }}>
                     {barLabel}
                   </div>
                 </div>
@@ -421,10 +419,10 @@
             
             return (
               <div style={{ 
-                padding: '16px', 
+                padding: '18px', 
                 background: 'white',
-                border: `2px solid ${fridge.color}`,
-                borderRadius: '8px',
+                border: `3px solid ${fridge.color}`,
+                borderRadius: '10px',
                 position: 'relative'
               }}>
                 {/* Best ROI badge */}
@@ -435,10 +433,10 @@
                     right: '12px', 
                     background: '#15803d', 
                     color: 'white', 
-                    fontSize: '11px', 
+                    fontSize: '12px', 
                     fontWeight: '700', 
-                    padding: '4px 12px', 
-                    borderRadius: '10px',
+                    padding: '5px 14px', 
+                    borderRadius: '12px',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
                   }}>
                     BEST ROI
@@ -446,19 +444,19 @@
                 )}
                 
                 {/* Header */}
-                <div style={{ marginBottom: '12px', paddingBottom: '10px', borderBottom: `2px solid ${fridge.color}` }}>
+                <div style={{ marginBottom: '14px', paddingBottom: '12px', borderBottom: `2px solid ${fridge.color}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: fridge.color }} />
-                    <div style={{ fontWeight: '700', fontSize: '15px', color: '#1f2937' }}>{fridge.name}</div>
+                    <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: fridge.color }} />
+                    <div style={{ fontWeight: '700', fontSize: '17px', color: '#1f2937' }}>{fridge.name}</div>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#6b7280' }}>{fridge.capacity} • {fridge.businessScale}</div>
+                  <div style={{ fontSize: '13px', color: '#6b7280' }}>{fridge.capacity} • {fridge.businessScale}</div>
                 </div>
                 
-                {/* Verdict badge with explainer */}
+                {/* Verdict badge */}
                 <div style={{ 
-                  padding: '10px',
+                  padding: '12px',
                   background: verdict.bg,
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   marginBottom: '14px',
                   textAlign: 'center'
                 }}>
@@ -467,7 +465,7 @@
                     alignItems: 'center', 
                     justifyContent: 'center',
                     gap: '6px',
-                    fontSize: '14px',
+                    fontSize: '16px',
                     fontWeight: '600',
                     color: verdict.color,
                     marginBottom: '4px'
@@ -475,33 +473,33 @@
                     <span>{verdict.icon}</span>
                     <span>{verdict.label}</span>
                   </div>
-                  <div style={{ fontSize: '11px', color: verdict.color, opacity: 0.85 }}>
+                  <div style={{ fontSize: '13px', color: verdict.color, opacity: 0.85 }}>
                     {verdict.explainer}
                   </div>
                 </div>
 
                 {/* Key metrics row */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
-                  <div style={{ background: '#f9fafb', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '3px' }}>Net monthly</div>
+                  <div style={{ background: '#f9fafb', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Net monthly</div>
                     <div style={{ fontSize: '22px', fontWeight: '700', color: netMonthlyGain >= 0 ? '#15803d' : '#dc2626' }}>
                       {netMonthlyGain >= 0 ? '+' : ''}${Math.round(netMonthlyGain)}
                     </div>
                   </div>
-                  <div style={{ background: '#f9fafb', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '3px' }}>Break-even</div>
+                  <div style={{ background: '#f9fafb', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Break-even</div>
                     <div style={{ fontSize: '22px', fontWeight: '700', color: '#1e40af' }}>
                       {breakEvenMonth ? `Mo ${breakEvenMonth}` : '—'}
                     </div>
                   </div>
-                  <div style={{ background: '#f9fafb', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '3px' }}>7-year value</div>
+                  <div style={{ background: '#f9fafb', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>7-year value</div>
                     <div style={{ fontSize: '18px', fontWeight: '700', color: lifetimeNetValue >= 0 ? '#15803d' : '#dc2626' }}>
                       ${Math.round(lifetimeNetValue).toLocaleString()}
                     </div>
                   </div>
-                  <div style={{ background: '#f9fafb', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '3px' }}>ROI</div>
+                  <div style={{ background: '#f9fafb', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>ROI</div>
                     <div style={{ fontSize: '18px', fontWeight: '700', color: roi >= 0 ? '#15803d' : '#dc2626' }}>
                       {Math.round(roi)}%
                     </div>
@@ -509,8 +507,8 @@
                 </div>
 
                 {/* Waterfall chart */}
-                <div style={{ marginBottom: '14px', padding: '10px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', marginBottom: '8px' }}>Monthly cash flow</div>
+                <div style={{ marginBottom: '14px', padding: '12px', background: '#f9fafb', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center', marginBottom: '8px' }}>Monthly cash flow</div>
                   <WaterfallChart 
                     benefits={totalMonthlyBenefit} 
                     costs={totalMonthlyCost} 
@@ -519,13 +517,13 @@
                 </div>
 
                 {/* Equipment & financing */}
-                <div style={{ fontSize: '12px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '13px', marginBottom: '12px' }}>
                   <div style={{ fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Equipment & financing</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <span style={{ color: '#6b7280' }}>Price:</span>
                     <span style={{ fontWeight: '600', color: fridge.color }}>${fridge.cashPrice}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <span style={{ color: '#6b7280' }}>Total cost:</span>
                     <span>${Math.round(financing.totalCost)}</span>
                   </div>
@@ -536,17 +534,17 @@
                 </div>
 
                 {/* Business economics */}
-                <div style={{ fontSize: '12px', marginBottom: '12px' }}>
+                <div style={{ fontSize: '13px', marginBottom: '12px' }}>
                   <div style={{ fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Business economics</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <span style={{ color: '#6b7280' }}>Baseline revenue:</span>
                     <span>${baselineMonthlyRevenue}/mo</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <span style={{ color: '#6b7280' }}>Baseline profit:</span>
                     <span>${Math.round(baselineMonthlyProfit)}/mo</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <span style={{ color: '#6b7280' }}>Uplift ({fridge.upliftBonus > 0 ? `+${fridge.upliftBonus}% bonus` : 'base'}):</span>
                     <span style={{ fontWeight: '500' }}>{effectiveUplift}%</span>
                   </div>
@@ -557,168 +555,155 @@
                 </div>
 
                 {/* Monthly breakdown */}
-                <div style={{ fontSize: '12px', padding: '10px', background: '#f0fdf4', borderRadius: '6px', marginBottom: '10px' }}>
+                <div style={{ fontSize: '13px', padding: '12px', background: '#f0fdf4', borderRadius: '8px', marginBottom: '10px' }}>
                   <div style={{ fontWeight: '600', color: '#166534', marginBottom: '6px' }}>Monthly benefits</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                     <span>Profit increase:</span>
                     <span>+${Math.round(profitIncrease)}</span>
                   </div>
                   {chargingRevenueEnabled && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                       <span>USB charging:</span>
                       <span>+${Math.round(chargingRevenue)}</span>
                     </div>
                   )}
                   {generatorSavingsEnabled && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                       <span>Generator savings:</span>
                       <span>+${Math.round(generatorSavings)}</span>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', borderTop: '1px solid #bbf7d0', marginTop: '6px', paddingTop: '6px' }}>
-                    <span>Total:</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #bbf7d0', paddingTop: '4px', marginTop: '4px', fontWeight: '600' }}>
+                    <span>Total benefits:</span>
                     <span>+${Math.round(totalMonthlyBenefit)}</span>
                   </div>
                 </div>
 
-                <div style={{ fontSize: '12px', padding: '10px', background: '#fef2f2', borderRadius: '6px' }}>
+                <div style={{ fontSize: '13px', padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
                   <div style={{ fontWeight: '600', color: '#991b1b', marginBottom: '6px' }}>Monthly costs</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                    <span>Financing:</span>
-                    <span>-${Math.round(financing.monthlyPayment)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                    <span>Payment:</span>
+                    <span>${Math.round(financing.monthlyPayment)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                     <span>Maintenance:</span>
-                    {paymentMethod === 'payg' ? (
-                      <span style={{ color: '#16a34a', fontWeight: '500' }}>Included</span>
-                    ) : (
-                      <span>-${Math.round(monthlyMaintenance)}</span>
-                    )}
+                    <span>${Math.round(monthlyMaintenance)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', borderTop: '1px solid #fecaca', marginTop: '6px', paddingTop: '6px' }}>
-                    <span>Total:</span>
-                    <span>-${Math.round(totalMonthlyCost)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #fecaca', paddingTop: '4px', marginTop: '4px', fontWeight: '600' }}>
+                    <span>Total costs:</span>
+                    <span>${Math.round(totalMonthlyCost)}</span>
                   </div>
                 </div>
-
-                {/* Stock requirement note */}
-                {verdict.status !== 'error' && (
-                  <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '10px', fontStyle: 'italic', textAlign: 'center' }}>
-                    Requires ~${fridge.stockRequired} in stock inventory
-                  </div>
-                )}
               </div>
             );
           };
 
           return (
-            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', background: 'white' }}>
-              <h1 style={{ fontSize: '22px', fontWeight: 'bold', marginBottom: '14px' }}>Solar refrigeration economic impact model</h1>
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', background: 'white' }}>
+              <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>Solar refrigeration economic impact model</h1>
               
-              {/* Explanation */}
-              <div style={{ padding: '14px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', marginBottom: '18px', fontSize: '12px', color: '#1e3a5f', lineHeight: '1.6' }}>
-                <strong>How this model works:</strong> Set your baseline monthly revenue to see which fridge size is viable for your business scale. Larger fridges get uplift bonuses (+10% medium, +20% large) reflecting expanded product range. PAYG rental spreads cost over equipment lifespan with maintenance included. Affordability is based on baseline profit: payments above 50% of current profit are unaffordable, 30-50% are stretched.
+              <div style={{ padding: '16px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', marginBottom: '20px', fontSize: '15px', color: '#1e1e1e', lineHeight: '1.6' }}>
+                <p style={{ marginBottom: '10px' }}>
+                  <strong>What this model does:</strong> Estimates whether solar refrigeration makes economic sense for different business scales. It compares revenue uplift and cost savings against equipment payments to determine viability and affordability.
+                </p>
+                <p>
+                  <strong>How to use it:</strong> Set your baseline monthly revenue to match the business scale you're analyzing. Adjust fridge prices, financing terms, and business economics. The model shows which fridge sizes are viable and affordable at each revenue level.
+                </p>
               </div>
 
-              {/* Parameters */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr 1fr', gap: '14px', marginBottom: '24px' }}>
+              {/* Input panels - 4 column grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                 
-                {/* Equipment & Business Scale */}
-                <div style={{ padding: '14px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>Equipment prices</h3>
+                {/* Equipment Pricing */}
+                <div style={{ padding: '16px', background: '#f9fafb', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '14px' }}>Equipment pricing</h3>
                   
-                  <div style={{ marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid #e5e7eb' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#3b82f6' }} />
-                      <span style={{ fontSize: '12px', fontWeight: '500' }}>Small fridge (50-100L)</span>
+                  <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #e5e7eb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#3b82f6' }} />
+                      <span style={{ fontSize: '13px', fontWeight: '500' }}>Small fridge (50-100L)</span>
                     </div>
                     <SliderControl label="Price" value={smallPrice} onChange={setSmallPrice} min={300} max={800} step={25} prefix="$" color="#3b82f6" />
                   </div>
                   
-                  <div style={{ marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid #e5e7eb' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f97316' }} />
-                      <span style={{ fontSize: '12px', fontWeight: '500' }}>Medium fridge (150-250L)</span>
+                  <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid #e5e7eb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#f97316' }} />
+                      <span style={{ fontSize: '13px', fontWeight: '500' }}>Medium fridge (150-250L)</span>
                     </div>
                     <SliderControl label="Price" value={mediumPrice} onChange={setMediumPrice} min={600} max={1400} step={50} prefix="$" color="#f97316" />
                   </div>
                   
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#8b5cf6' }} />
-                      <span style={{ fontSize: '12px', fontWeight: '500' }}>Large freezer (350-500L)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#8b5cf6' }} />
+                      <span style={{ fontSize: '13px', fontWeight: '500' }}>Large freezer (350-500L)</span>
                     </div>
                     <SliderControl label="Price" value={largePrice} onChange={setLargePrice} min={1000} max={2000} step={50} prefix="$" color="#8b5cf6" />
                   </div>
                 </div>
 
-                {/* Payment Method */}
-                <div style={{ padding: '14px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>Payment method</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
+                {/* Payment Method - PURPLE BACKGROUND */}
+                <div style={{ padding: '16px', background: '#faf5ff', border: '2px solid #e9d5ff', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '14px', color: '#6b21a8' }}>Payment method</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }}>
                     {[
                       { key: 'upfront', label: 'Cash upfront', desc: 'Full payment at purchase' },
-                      { key: 'loan', label: 'Consumer loan', desc: 'Bank/MFI financing, you own the asset' },
+                      { key: 'loan', label: 'Consumer loan', desc: 'Bank/MFI financing, you own asset' },
                       { key: 'payg', label: 'PAYG rental', desc: 'Rent-to-own from provider' }
                     ].map(opt => (
                       <button 
                         key={opt.key}
                         onClick={() => setPaymentMethod(opt.key)} 
                         style={{ 
-                          padding: '10px 12px',
-                          fontSize: '12px',
-                          borderRadius: '4px',
+                          padding: '10px 14px',
+                          fontSize: '13px',
+                          borderRadius: '6px',
                           cursor: 'pointer',
-                          border: '1px solid #331A38',
-                          background: paymentMethod === opt.key ? '#331A38' : 'white',
+                          border: '2px solid #1e1e1e',
+                          background: paymentMethod === opt.key ? '#1e1e1e' : 'white',
                           color: paymentMethod === opt.key ? 'white' : '#374151',
                           textAlign: 'left',
                           fontWeight: paymentMethod === opt.key ? '600' : '400'
                         }}
                       >
                         <div>{opt.label}</div>
-                        <div style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>{opt.desc}</div>
+                        <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '2px' }}>{opt.desc}</div>
                       </button>
                     ))}
                   </div>
                   
                   {paymentMethod === 'loan' && (
-                    <div style={{ marginBottom: '12px' }}>
-                      <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px', lineHeight: '1.4' }}>
-                        Consumer loans from banks or microfinance institutions. You own the equipment from day one. Typically requires deposit and credit history.
-                      </div>
+                    <div style={{ marginBottom: '12px', padding: '12px', background: 'white', borderRadius: '6px' }}>
                       <SliderControl label="Deposit" value={depositPercent} onChange={setDepositPercent} min={0} max={50} step={5} unit="%" />
-                      <SliderControl label="Term" value={loanTermMonths} onChange={setLoanTermMonths} min={6} max={36} step={3} unit=" mo" />
+                      <SliderControl label="Term" value={loanTermMonths} onChange={setLoanTermMonths} min={6} max={36} step={3} unit=" months" />
                       <SliderControl label="APR" value={annualInterestRate} onChange={setAnnualInterestRate} min={15} max={50} step={1} unit="%" />
                     </div>
                   )}
                   
                   {paymentMethod === 'payg' && (
-                    <div style={{ marginBottom: '12px' }}>
-                      <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '8px', lineHeight: '1.4' }}>
-                        Rent equipment from a PAYG provider. No deposit required. Provider handles maintenance and repairs. You own it after the rental period ends.
-                      </div>
-                      <SliderControl label="Rental period" value={paygTermMonths} onChange={setPaygTermMonths} min={36} max={84} step={6} unit=" mo" helpText="Equipment lifespan ~84 months" />
+                    <div style={{ marginBottom: '12px', padding: '12px', background: 'white', borderRadius: '6px' }}>
+                      <SliderControl label="Rental period" value={paygTermMonths} onChange={setPaygTermMonths} min={36} max={84} step={6} unit=" months" helpText="Equipment lifespan ~84 months" />
                       <SliderControl label="Total premium" value={paygPremiumPercent} onChange={setPaygPremiumPercent} min={30} max={150} step={10} unit="%" helpText="Above cash price (covers service)" />
-                      <div style={{ fontSize: '10px', color: '#16a34a', marginTop: '6px', padding: '6px 8px', background: '#f0fdf4', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '12px', color: '#16a34a', marginTop: '8px', padding: '8px', background: '#f0fdf4', borderRadius: '4px' }}>
                         ✓ Maintenance included (provider responsibility)
                       </div>
                     </div>
                   )}
                   
                   {paymentMethod === 'upfront' && (
-                    <div style={{ fontSize: '10px', color: '#6b7280', marginBottom: '12px', lineHeight: '1.4' }}>
+                    <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px', lineHeight: '1.5', padding: '12px', background: 'white', borderRadius: '6px' }}>
                       Pay full price upfront. Lowest total cost but highest barrier to entry. You handle maintenance.
                     </div>
                   )}
                   
                   {/* Monthly payment preview */}
-                  <div style={{ padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>Monthly payments</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
+                  <div style={{ padding: '12px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '8px', color: '#374151' }}>Monthly payments</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '13px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }}></span>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#3b82f6' }}></span>
                           Small
                         </span>
                         <span style={{ fontWeight: '600', color: '#3b82f6' }}>
@@ -727,7 +712,7 @@
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f97316' }}></span>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f97316' }}></span>
                           Medium
                         </span>
                         <span style={{ fontWeight: '600', color: '#f97316' }}>
@@ -736,7 +721,7 @@
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#8b5cf6' }}></span>
+                          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#8b5cf6' }}></span>
                           Large
                         </span>
                         <span style={{ fontWeight: '600', color: '#8b5cf6' }}>
@@ -744,23 +729,18 @@
                         </span>
                       </div>
                     </div>
-                    {paymentMethod === 'upfront' && (
-                      <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '6px', fontStyle: 'italic' }}>
-                        (Full amount due at purchase)
-                      </div>
-                    )}
                   </div>
                 </div>
 
                 {/* Shared Economics */}
-                <div style={{ padding: '14px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>Business economics</h3>
+                <div style={{ padding: '16px', background: '#f9fafb', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '14px' }}>Business economics</h3>
                   
                   {/* Baseline revenue with scale labels */}
-                  <div style={{ marginBottom: '14px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151' }}>Baseline monthly revenue</label>
-                      <span style={{ fontSize: '12px', fontWeight: '600', color: '#331A38' }}>${baselineRevenue}/mo</span>
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>Baseline monthly revenue</label>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e1e1e' }}>${baselineRevenue}/mo</span>
                     </div>
                     <input 
                       type="range" 
@@ -768,58 +748,58 @@
                       onChange={(e) => setBaselineRevenue(parseFloat(e.target.value))}
                       style={{ 
                         width: '100%', 
-                        marginBottom: '6px',
-                        height: '3px',
-                        background: `linear-gradient(to right, #331A38 0%, #331A38 ${((baselineRevenue - 100) / 700) * 100}%, #e5e7eb ${((baselineRevenue - 100) / 700) * 100}%, #e5e7eb 100%)`,
+                        marginBottom: '8px',
+                        height: '5px',
+                        background: `linear-gradient(to right, #1e1e1e 0%, #1e1e1e ${((baselineRevenue - 100) / 700) * 100}%, #e5e7eb ${((baselineRevenue - 100) / 700) * 100}%, #e5e7eb 100%)`,
                         borderRadius: '3px',
                         outline: 'none',
                         WebkitAppearance: 'none'
                       }}
                     />
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#6b7280' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280' }}>
                       <span>$100</span>
                       <span>$800</span>
                     </div>
                     <div style={{ 
                       display: 'flex', 
                       justifyContent: 'space-between', 
-                      marginTop: '8px',
-                      padding: '8px',
+                      marginTop: '10px',
+                      padding: '10px',
                       background: '#f3f4f6',
-                      borderRadius: '4px'
+                      borderRadius: '6px'
                     }}>
                       <div style={{ 
                         textAlign: 'center', 
-                        fontSize: '10px', 
+                        fontSize: '11px', 
                         color: baselineRevenue <= 200 ? '#3b82f6' : '#9ca3af',
                         fontWeight: baselineRevenue <= 200 ? '600' : '400',
                         padding: '0 4px'
                       }}>
                         <div>🏪</div>
                         <div>Kiosk</div>
-                        <div style={{ fontSize: '8px' }}>$100-200</div>
+                        <div style={{ fontSize: '10px' }}>$100-200</div>
                       </div>
                       <div style={{ 
                         textAlign: 'center', 
-                        fontSize: '10px', 
+                        fontSize: '11px', 
                         color: baselineRevenue > 200 && baselineRevenue <= 450 ? '#f97316' : '#9ca3af',
                         fontWeight: baselineRevenue > 200 && baselineRevenue <= 450 ? '600' : '400',
                         padding: '0 4px'
                       }}>
                         <div>🏬</div>
                         <div>Small shop</div>
-                        <div style={{ fontSize: '8px' }}>$200-450</div>
+                        <div style={{ fontSize: '10px' }}>$200-450</div>
                       </div>
                       <div style={{ 
                         textAlign: 'center', 
-                        fontSize: '10px', 
+                        fontSize: '11px', 
                         color: baselineRevenue > 450 ? '#8b5cf6' : '#9ca3af',
                         fontWeight: baselineRevenue > 450 ? '600' : '400',
                         padding: '0 4px'
                       }}>
                         <div>🏢</div>
                         <div>Market trader</div>
-                        <div style={{ fontSize: '8px' }}>$450+</div>
+                        <div style={{ fontSize: '10px' }}>$450+</div>
                       </div>
                     </div>
                   </div>
@@ -827,13 +807,13 @@
                   <SliderControl label="Profit margin" value={profitMargin} onChange={setProfitMargin} min={10} max={50} step={5} unit="%" />
                   <SliderControl label="Base revenue uplift" value={baseUplift} onChange={setBaseUplift} min={10} max={80} step={5} unit="%" helpText="Medium +10%, Large +20% on top" />
                   
-                  <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '12px', paddingTop: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '500' }}>USB charging</span>
+                  <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '14px', paddingTop: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '500' }}>USB charging</span>
                       <button 
                         onClick={() => setChargingRevenueEnabled(!chargingRevenueEnabled)}
                         style={{
-                          padding: '4px 12px', fontSize: '11px', borderRadius: '4px', cursor: 'pointer', border: 'none',
+                          padding: '6px 14px', fontSize: '12px', borderRadius: '4px', cursor: 'pointer', border: 'none',
                           background: chargingRevenueEnabled ? '#22c55e' : '#e5e7eb',
                           color: chargingRevenueEnabled ? 'white' : '#6b7280',
                           fontWeight: '600'
@@ -849,17 +829,17 @@
                 </div>
 
                 {/* Operating Factors */}
-                <div style={{ padding: '14px', background: '#f9fafb', borderRadius: '6px' }}>
-                  <h3 style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px' }}>Operating factors</h3>
+                <div style={{ padding: '16px', background: '#f9fafb', borderRadius: '8px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '14px' }}>Operating factors</h3>
                   <SliderControl label="Tech reliability" value={reliabilityPercent} onChange={setReliabilityPercent} min={50} max={100} step={5} unit="%" helpText="Rainy days, repairs, downtime" />
                   
                   {paymentMethod === 'payg' ? (
-                    <div style={{ marginBottom: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                        <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151' }}>Annual maintenance</label>
-                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#16a34a' }}>$0</span>
+                    <div style={{ marginBottom: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151' }}>Annual maintenance</label>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#16a34a' }}>$0</span>
                       </div>
-                      <div style={{ fontSize: '10px', color: '#16a34a', padding: '6px 8px', background: '#f0fdf4', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '12px', color: '#16a34a', padding: '8px 10px', background: '#f0fdf4', borderRadius: '6px' }}>
                         ✓ Included in PAYG rental (provider handles repairs)
                       </div>
                     </div>
@@ -867,13 +847,13 @@
                     <SliderControl label="Annual maintenance" value={maintenancePercent} onChange={setMaintenancePercent} min={0} max={15} step={1} unit="% of price" helpText="3-8% typical for owned equipment" />
                   )}
                   
-                  <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '12px', paddingTop: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '500' }}>Generator savings</span>
+                  <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '14px', paddingTop: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '500' }}>Generator savings</span>
                       <button 
                         onClick={() => setGeneratorSavingsEnabled(!generatorSavingsEnabled)}
                         style={{
-                          padding: '4px 12px', fontSize: '11px', borderRadius: '4px', cursor: 'pointer', border: 'none',
+                          padding: '6px 14px', fontSize: '12px', borderRadius: '4px', cursor: 'pointer', border: 'none',
                           background: generatorSavingsEnabled ? '#22c55e' : '#e5e7eb',
                           color: generatorSavingsEnabled ? 'white' : '#6b7280',
                           fontWeight: '600'
@@ -890,15 +870,15 @@
               </div>
 
               {/* Three-column outcomes */}
-              <h2 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px' }}>Outcomes by fridge size</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '18px', marginBottom: '18px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>Outcomes by fridge size</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '18px', marginBottom: '20px' }}>
                 <OutcomeCard metrics={allMetrics.small} isBest={bestOption === 'small'} />
                 <OutcomeCard metrics={allMetrics.medium} isBest={bestOption === 'medium'} />
                 <OutcomeCard metrics={allMetrics.large} isBest={bestOption === 'large'} />
               </div>
 
               {/* Methodology note */}
-              <div style={{ padding: '12px', background: '#f3f4f6', borderRadius: '6px', fontSize: '11px', color: '#6b7280', lineHeight: '1.6' }}>
+              <div style={{ padding: '16px', background: '#f3f4f6', borderRadius: '8px', fontSize: '13px', color: '#6b7280', lineHeight: '1.6' }}>
                 <strong>Methodology:</strong> Single baseline revenue applies to all fridge sizes to show viability at different business scales. Uplift bonuses: +10% (medium), +20% (large). PAYG rental period matches equipment lifespan (~7 years) with maintenance included. Consumer loans: you own the asset, handle maintenance. Affordability = payment ÷ baseline profit (>50% unaffordable, 30-50% stretched). ROI = annual net benefit ÷ annual total cost.
               </div>
             </div>
