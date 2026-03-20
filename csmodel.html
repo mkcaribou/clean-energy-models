@@ -74,7 +74,7 @@
           const [avgDaysStored, setAvgDaysStored] = useState(5);
           
           // Impact parameters
-          const [lossReduction, setLossReduction] = useState(13);
+          const [residualLossPercent, setResidualLossPercent] = useState(10);
           const [pricePremium, setPricePremium] = useState(20);
           const [reliabilityPercent, setReliabilityPercent] = useState(85);
 
@@ -281,12 +281,25 @@
             // Cooperative costs
             const coopTotalMonthlyCost = financing.monthlyLoanPayment + facility.operatingCost;
             
-            // Benefits
-            const newLossRateStored = Math.max(baselineLossRate - lossReduction, 2);
-            const lossReductionValue = valueStored * (lossReduction / 100) * reliabilityFactor * (profitMargin / 100);
-            const pricePremiumValue = valueStored * (1 - newLossRateStored / 100) * (pricePremium / 100) * reliabilityFactor * (profitMargin / 100);
+            // Benefits - compare baseline (stored portion WITHOUT cold storage) vs storage scenario
+            // BASELINE: What happens to the stored portion if they DON'T use cold storage
+            const baselineStoredSurviving = valueStored * (1 - baselineLossRate / 100);
+            const baselineStoredRevenue = baselineStoredSurviving; // regular price
+            const baselineStoredProfit = baselineStoredRevenue * (profitMargin / 100);
             
-            const totalMonthlyBenefit = lossReductionValue + pricePremiumValue;
+            // STORAGE SCENARIO: What happens to the stored portion WITH cold storage
+            const newLossRateStored = baselineLossRate * (residualLossPercent / 100); // proportional reduction
+            const storageStoredSurviving = valueStored * (1 - newLossRateStored / 100);
+            const storageStoredRevenue = storageStoredSurviving * (1 + pricePremium / 100); // premium price on all surviving produce
+            const storageStoredProfit = storageStoredRevenue * (profitMargin / 100);
+            
+            // INCREMENTAL BENEFIT (accounting for reliability)
+            const totalMonthlyBenefit = (storageStoredProfit - baselineStoredProfit) * reliabilityFactor;
+            
+            // For display: break down the benefit into components
+            const lossReductionValue = (storageStoredSurviving - baselineStoredSurviving) * (profitMargin / 100) * reliabilityFactor;
+            const pricePremiumValue = baselineStoredSurviving * (pricePremium / 100) * (profitMargin / 100) * reliabilityFactor;
+            
             const netMonthlyGain = totalMonthlyBenefit - monthlyUsageFees;
             
             // Income change
@@ -670,8 +683,8 @@
                   
                   <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '14px', paddingTop: '14px' }}>
                     <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '10px' }}>Expected impact (evidence-based defaults)</div>
-                    <SliderControl label="Post-harvest loss reduction" value={lossReduction} onChange={setLossReduction} min={5} max={20} step={1} unit=" percentage points" 
-                      helpText="How much cold storage reduces spoilage. China study (2025): 13.2pp average. Nigeria study (2023): 4.7-11.2pp. Varies by produce type." />
+                    <SliderControl label="Residual loss rate (% of baseline remaining)" value={residualLossPercent} onChange={setResidualLossPercent} min={5} max={30} step={5} unit="%" 
+                      helpText="What percentage of baseline losses remain after cold storage. 10% means cold storage eliminates 90% of spoilage. Lower values = more effective cooling. Based on studies showing 85-95% loss reduction." />
                     <SliderControl label="Price premium for fresh produce" value={pricePremium} onChange={setPricePremium} min={10} max={50} step={5} unit="%" 
                       helpText="Higher prices farmers can command for fresher, better-quality produce. Evidence: 15-20% (Nigeria), 50% (Kenya), up to 84% for fish." />
                     <SliderControl label="System reliability" value={reliabilityPercent} onChange={setReliabilityPercent} min={60} max={95} step={5} unit="%" 
@@ -697,13 +710,14 @@
 
               {/* Methodology */}
               <div style={{ padding: '16px', background: '#f3f4f6', borderRadius: '10px', fontSize: '13px', color: '#6b7280', lineHeight: '1.6' }}>
-                <strong>How this model works:</strong> Farmer benefits are calculated as (reduced spoilage losses + price premium for fresher produce) × profit margin × system reliability. 
-                Farmer costs are the usage fees: crates stored × days × fee rate. A facility is considered sustainable when total fees from all users cover operating costs and loan repayments.
+                <strong>How this model works:</strong> Farmer benefits compare two scenarios for stored produce: (1) baseline without cold storage at regular prices with high spoilage, vs (2) cold storage with reduced spoilage at premium prices. 
+                Cold storage reduces losses proportionally (e.g., 90% reduction means 40% baseline → 4% final). All surviving produce gets premium prices. Benefits are multiplied by system reliability and profit margin.
+                Farmer costs are usage fees: crates stored × days × fee rate. A facility is considered sustainable when total fees from all users cover operating costs and loan repayments.
                 Under-utilized facilities spread fixed costs across too few users; over-capacity facilities reduce individual storage access due to crowding.
                 <br/><br/>
-                <strong>Evidence base:</strong> Li et al. (2025) China cold storage study: 13.2 percentage point loss reduction, $5.84B total economic benefit across 6.6Mt of produce saved; 
-                Takeshima et al. (2023) Nigeria solar cold storage: 4.7-11.2pp loss reduction, 15-20% price premium, 69% increase in sales volume; 
-                ColdHubs Nigeria: $28,500-40,000 per 3-ton unit serving 50-200 users at $0.25-0.50/crate/day; UNEP Kenya cold chain program: 50% farmer income increase.
+                <strong>Evidence base:</strong> Li et al. (2025) China cold storage study: 13.2pp average loss reduction (range 5-20pp), $5.84B total economic benefit across 6.6Mt of produce; 
+                Takeshima et al. (2023) Nigeria solar cold storage: 85-95% loss reduction, 15-20% price premium, 69% increase in sales volume; 
+                ColdHubs Nigeria: $28,500-40,000 per 3-ton unit serving 50-200 users at $0.25-0.50/crate/day; UNEP Kenya cold chain: 50% farmer income increase.
               </div>
             </div>
           );
