@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clean cooking economic impact model — Caribou</title>
+    <title>Clean cooking financial impact model — Caribou</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -249,7 +249,7 @@
               const top = val >= 0 ? zero - h : zero;
               return (
                 <div style={{ position: 'absolute', left: `${x}px` }}>
-                  <div style={{ width: `${bw}px`, height: `${h}px`, position: 'absolute', top: `${top}px`, background: color, borderRadius: '3px' }}>
+                  <div style={{ width: `${bw}px`, height: `${h}px`, position: 'absolute', top: `${top}px`, background: color }}>
                     <div style={{ color: h > 16 ? 'white' : color, fontSize: '11px', fontWeight: '700', textAlign: 'center', position: h > 16 ? 'relative' : 'absolute', top: h > 16 ? '2px' : (val >= 0 ? '-15px' : `${h + 2}px`), width: '100%' }}>{label}</div>
                   </div>
                   <div style={{ fontSize: '11px', textAlign: 'center', width: `${bw}px`, position: 'absolute', top: `${H + 4}px`, color: '#6b7280', fontWeight: '500' }}>{bLabel}</div>
@@ -297,33 +297,33 @@
             const colors = { ics: B.mint, lpg: B.naranja, solar: B.lavender };
             const col = colors[techKey];
             return (
-              <div style={{ padding: '18px', background: 'white', border: `3px solid ${col}`, borderRadius: '10px' }}>
+              <div style={{ padding: '18px', background: 'white', border: `3px solid ${col}` }}>
                 <div style={{ marginBottom: '14px', paddingBottom: '12px', borderBottom: `2px solid ${col}` }}>
                   <div style={{ fontWeight: '700', fontSize: '17px', color: '#1f2937', marginBottom: '4px' }}>{tech.name}</div>
                   <div style={{ fontSize: '13px', color: '#6b7280' }}>{tech.description}</div>
                 </div>
-                <div style={{ padding: '12px', background: verdict.bg, border: `2px solid ${verdict.border}`, borderRadius: '8px', marginBottom: '14px', textAlign: 'center' }}>
+                <div style={{ padding: '12px', background: verdict.bg, border: `2px solid ${verdict.border}`, marginBottom: '14px', textAlign: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '16px', fontWeight: '700', color: verdict.color, marginBottom: '4px' }}>
                     <span>{verdict.icon}</span><span>{verdict.label}</span>
                   </div>
                   <div style={{ fontSize: '13px', color: verdict.color }}>{verdict.summary}</div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
-                  <div style={{ background: '#f9fafb', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                  <div style={{ background: '#f9fafb', padding: '10px', textAlign: 'center' }}>
                     <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Net annual benefit</div>
                     <div style={{ fontSize: '22px', fontWeight: '700', color: netBenefit >= 0 ? '#15803d' : B.red }}>{netBenefit >= 0 ? '+' : ''}${Math.round(netBenefit)}</div>
                   </div>
-                  <div style={{ background: '#f9fafb', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                  <div style={{ background: '#f9fafb', padding: '10px', textAlign: 'center' }}>
                     <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>ROI</div>
                     <div style={{ fontSize: '22px', fontWeight: '700', color: roi >= 0 ? '#15803d' : B.red }}>{Math.round(roi)}%</div>
                   </div>
                 </div>
-                <div style={{ marginBottom: '14px', padding: '12px', background: '#f9fafb', borderRadius: '8px' }}>
+                <div style={{ marginBottom: '14px', padding: '12px', background: '#f9fafb' }}>
                   <div style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center', marginBottom: '6px' }}>Annual economics breakdown</div>
                   <WaterfallChart fuelSavings={fuelSavings} timeValue={timeValue} capitalCost={capital} netBenefit={netBenefit} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div style={{ fontSize: '13px', padding: '12px', background: '#f0fdf4', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '13px', padding: '12px', background: '#f0fdf4' }}>
                     <div style={{ fontWeight: '600', color: '#166534', marginBottom: '6px' }}>Annual benefits</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                       <span>Fuel savings:</span><span style={{ fontWeight: '500', color: fuelSavings >= 0 ? '#166534' : B.red }}>{fuelSavings >= 0 ? '+' : ''}${Math.round(fuelSavings)}</span>
@@ -332,7 +332,7 @@
                       <span>Time value:</span><span style={{ fontWeight: '500', color: '#166534' }}>+${Math.round(timeValue)}</span>
                     </div>
                   </div>
-                  <div style={{ fontSize: '13px', padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '13px', padding: '12px', background: '#fef2f2' }}>
                     <div style={{ fontWeight: '600', color: '#991b1b', marginBottom: '6px' }}>Annual costs</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                       <span>Capital cost:</span><span style={{ fontWeight: '500' }}>${Math.round(capital)}</span>
@@ -342,7 +342,7 @@
                     </div>
                   </div>
                 </div>
-                <div style={{ marginTop: '12px', padding: '10px', background: '#f9fafb', borderRadius: '6px', fontSize: '13px', color: '#4b5563' }}>
+                <div style={{ marginTop: '12px', padding: '10px', background: '#f9fafb', fontSize: '13px', color: '#4b5563' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                     <span>Hours saved per year:</span><span style={{ fontWeight: '600' }}>{Math.round(totalHours)} hrs</span>
                   </div>
@@ -357,7 +357,7 @@
           };
 
           const btnStyle = (active) => ({
-            flex: 1, padding: '10px 14px', fontSize: '14px', borderRadius: '6px', cursor: 'pointer',
+            flex: 1, padding: '10px 14px', fontSize: '14px', cursor: 'pointer',
             border: `2px solid ${B.hazyPlum}`,
             background: active ? B.hazyPlum : 'white',
             color: active ? 'white' : '#374151',
@@ -369,15 +369,24 @@
             <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', background: 'white' }}>
 
               {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px', marginBottom: '24px' }}>
-                <img src="Caribou_Logo_Primary_Black.png" alt="Caribou" style={{ height: '28px', flexShrink: 0 }} />
-                <h1 style={{ fontFamily: "'Crimson Text', Georgia, serif", fontSize: '32px', fontWeight: '400', color: '#1e1e1e', lineHeight: '.65', margin: 0 }}>
-                  Clean cooking financial impact model
-                </h1>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '16px' }}>
+                  <img src="Caribou_Logo_Primary_Black.png" alt="Caribou" style={{ height: '28px', flexShrink: 0 }} />
+                  <h1 style={{ fontFamily: "'Crimson Text', Georgia, serif", fontSize: '32px', fontWeight: '400', color: '#1e1e1e', lineHeight: '.65', margin: 0 }}>
+                    Clean cooking financial impact model
+                  </h1>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '24px' }}>
+                  <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Produced with support from</div>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <img src="../Caribou Logos/Shell_Foundation_Logo.jpg" alt="Shell Foundation" style={{ height: '26px' }} />
+                    <img src="../Caribou Logos/UKaid.png" alt="UKaid" style={{ height: '32px' }} />
+                  </div>
+                </div>
               </div>
 
               {/* Instructions — dark purple, sharp corners */}
-              <div style={{ padding: '16px 20px', background: B.hazyPlum, borderRadius: 0, marginBottom: '20px', fontSize: '15px', color: 'white', lineHeight: '1.6' }}>
+              <div style={{ padding: '16px 20px', background: B.hazyPlum, marginBottom: '20px', fontSize: '15px', color: 'white', lineHeight: '1.6' }}>
                 <p style={{ marginBottom: '10px' }}>
                   <strong>What this model does:</strong> Estimates the annual economic return of clean cooking technologies for low-income households. It compares fuel costs, time savings, and capital costs to calculate net benefit, ROI, and payback period.
                 </p>
@@ -387,7 +396,7 @@
               </div>
 
               {/* Technology costs */}
-              <div style={{ padding: '20px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '8px', marginBottom: '20px' }}>
+              <div style={{ padding: '20px', background: '#f9fafb', border: '1px solid #e5e7eb', marginBottom: '20px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: '#1e1e1e' }}>Technology costs</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
                   <div>
@@ -410,7 +419,7 @@
               </div>
 
               {/* Payment method — light plum, brand-aligned */}
-              <div style={{ padding: '20px', background: '#f5f0f6', border: '2px solid #d4c2d8', borderRadius: '8px', marginBottom: '20px' }}>
+              <div style={{ padding: '20px', background: '#f5f0f6', border: '2px solid #d4c2d8', marginBottom: '20px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: B.hazyPlum }}>Payment method and financing</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                   <div>
@@ -421,21 +430,21 @@
                     </div>
 
                     {paymentMethod === 'financing' && (
-                      <div style={{ padding: '16px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                      <div style={{ padding: '16px', background: 'white', border: '1px solid #e5e7eb' }}>
                         <SliderControl label="Deposit requirement" value={depositPercent} onChange={setDepositPercent} min={0} max={50} step={5} unit="%" helpText="Most MFIs require 10-30% upfront" />
                         <SliderControl label="Loan term" value={loanTermYears} onChange={setLoanTermYears} min={0.5} max={3} step={0.5} unit=" years" helpText="Cookstove loans typically 1-2 years" />
                         <SliderControl label="Annual interest rate (APR)" value={annualInterestRate} onChange={setAnnualInterestRate} min={15} max={50} step={1} unit="%" helpText="Rural MFI rates: 20-35% typical" />
                       </div>
                     )}
                     {paymentMethod === 'payg' && (
-                      <div style={{ padding: '16px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                      <div style={{ padding: '16px', background: 'white', border: '1px solid #e5e7eb' }}>
                         <SliderControl label="Lease-to-own term" value={paygTermYears} onChange={setPaygTermYears} min={1} max={4} step={0.5} unit=" years" helpText="Period until household owns asset" />
                         <SliderControl label="Total premium over cash price" value={paygPremiumPercent} onChange={setPaygPremiumPercent} min={30} max={100} step={5} unit="%" helpText="PAYG cookstoves typically 50-80% premium" />
                         <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>No deposit required. Household owns asset after completing all payments.</div>
                       </div>
                     )}
                     {paymentMethod === 'upfront' && (
-                      <div style={{ padding: '16px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '14px', color: '#4b5563' }}>
+                      <div style={{ padding: '16px', background: 'white', border: '1px solid #e5e7eb', fontSize: '14px', color: '#4b5563' }}>
                         <p>Full cash payment upfront. Lowest total cost, but requires access to lump sum capital.</p>
                         <p style={{ marginTop: '10px', fontWeight: '500' }}>Best ROI, but highest access barrier for low-income households.</p>
                       </div>
@@ -447,7 +456,7 @@
 
                   <div>
                     <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px', color: B.hazyPlum }}>Financing summary by technology</div>
-                    <div style={{ padding: '16px', background: 'white', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '14px' }}>
+                    <div style={{ padding: '16px', background: 'white', border: '1px solid #e5e7eb', fontSize: '14px' }}>
                       {[
                         { label: 'ICS',   f: icsF,   total: icsF.totalCost },
                         { label: 'LPG',   f: lpgF,   total: lpgF.totalCost },
@@ -472,14 +481,14 @@
                     {allIssues.length > 0 && (
                       <div style={{ marginTop: '14px' }}>
                         {allIssues.map((issue, idx) => (
-                          <div key={idx} style={{ padding: '12px', background: issue.severity === 'error' ? '#fee2e2' : '#fef3c7', border: `2px solid ${issue.severity === 'error' ? '#fecaca' : '#fde68a'}`, borderRadius: '6px', marginBottom: '8px', fontSize: '13px', lineHeight: '1.5' }}>
+                          <div key={idx} style={{ padding: '12px', background: issue.severity === 'error' ? '#fee2e2' : '#fef3c7', border: `2px solid ${issue.severity === 'error' ? '#fecaca' : '#fde68a'}`, marginBottom: '8px', fontSize: '13px', lineHeight: '1.5' }}>
                             <strong>{issue.severity === 'error' ? '⛔' : '⚠️'}</strong> {issue.message}
                           </div>
                         ))}
                       </div>
                     )}
                     {allIssues.length === 0 && (
-                      <div style={{ marginTop: '14px', padding: '12px', background: '#dcfce7', border: `2px solid ${B.mint}`, borderRadius: '6px', fontSize: '13px', lineHeight: '1.5', color: B.clover }}>
+                      <div style={{ marginTop: '14px', padding: '12px', background: '#dcfce7', border: `2px solid ${B.mint}`, fontSize: '13px', lineHeight: '1.5', color: B.clover }}>
                         <strong>✓ Affordability check passed:</strong> {paymentMethod === 'upfront' ? 'Upfront costs are within sustainable range relative to household income.' : 'All monthly payments are within sustainable range relative to household income.'}
                       </div>
                     )}
@@ -489,13 +498,13 @@
 
               {/* Baseline context */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                <div style={{ padding: '18px', background: '#f9fafb', borderRadius: '8px' }}>
+                <div style={{ padding: '18px', background: '#f9fafb' }}>
                   <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px', color: '#1e1e1e' }}>Baseline context</h3>
                   <SliderControl label="Annual baseline fuel cost" value={baselineFuelCost} onChange={setBaselineFuelCost} min={0} max={300} step={5} unit=" USD/yr" helpText="Traditional fuels (wood, charcoal) may be gathered free, purchased, or both" />
                   <SliderControl label="Daily fuel collection time" value={baselineFuelCollection} onChange={setBaselineFuelCollection} min={0} max={5} step={0.1} unit=" hrs" helpText="Time women spend gathering firewood/fuel daily" />
                   <SliderControl label="Daily cooking time" value={baselineCookingTime} onChange={setBaselineCookingTime} min={2} max={10} step={0.1} unit=" hrs" helpText="Includes meal prep and tending traditional stove" />
                 </div>
-                <div style={{ padding: '18px', background: '#f9fafb', borderRadius: '8px' }}>
+                <div style={{ padding: '18px', background: '#f9fafb' }}>
                   <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '14px', color: '#1e1e1e' }}>Time value and adoption</h3>
                   <SliderControl label="Wage rate" value={wageRate} onChange={setWageRate} min={0.1} max={2} step={0.01} unit=" USD/hr" helpText="Based on local agricultural wage rates" />
                   <SliderControl label="Time reallocated to paid work" value={timeReallocationPct} onChange={setTimeReallocationPct} min={0} max={100} step={5} unit="%" helpText="Portion of time saved that generates income" />
@@ -503,7 +512,7 @@
                 </div>
               </div>
 
-              {/* Time saved — light blue, not blush */}
+              {/* Time saved — light blue */}
               <div style={{ padding: '16px', background: '#eff6ff', borderLeft: '4px solid #4A334E', marginBottom: '20px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px', color: '#1e1e1e' }}>Time saved by women (per year, at current stacking level)</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', fontSize: '14px' }}>
@@ -522,7 +531,7 @@
 
               {/* Outcome cards */}
               <div style={{ marginBottom: '20px' }}>
-                <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '14px', color: '#1e1e1e' }}>Economic comparison: {getLabel("ICS")} | {getLabel("LPG")} | {getLabel("Solar")}</h2>
+                <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '14px', color: '#1e1e1e' }}>Financial comparison: {getLabel("ICS")} | {getLabel("LPG")} | {getLabel("Solar")}</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '18px' }}>
                   <OutcomeCard tech={technologies.ics}   techKey="ics"   financing={icsF}   fuelSavings={icsSav}   timeValue={icsTime}   totalHours={icsHours}   capital={icsCapital}   netBenefit={icsNet}   roi={icsROI}   payback={icsPayback}   verdict={icsV} />
                   <OutcomeCard tech={technologies.lpg}   techKey="lpg"   financing={lpgF}   fuelSavings={lpgSav}   timeValue={lpgTime}   totalHours={lpgHours}   capital={lpgCapital}   netBenefit={lpgNet}   roi={lpgROI}   payback={lpgPayback}   verdict={lpgV} />
@@ -530,9 +539,9 @@
                 </div>
               </div>
 
-              {/* Summary boxes — sharp corners, original color shades */}
+              {/* Summary boxes — sharp corners */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '14px' }}>
-                <div style={{ padding: '16px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 0 }}>
+                <div style={{ padding: '16px', background: '#eff6ff', border: '1px solid #bfdbfe' }}>
                   <h3 style={{ fontWeight: '600', marginBottom: '10px', color: '#1e1e1e' }}>Baseline conditions</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#374151' }}>
                     <div><strong>Primary fuel:</strong> Biomass (wood, charcoal), traditional 3-stone fire</div>
@@ -542,7 +551,7 @@
                     <div><strong>Monthly household income:</strong> ${monthlyHouseholdIncome}</div>
                   </div>
                 </div>
-                <div style={{ padding: '16px', background: '#dcfce7', border: '1px solid #22c55e', borderRadius: 0 }}>
+                <div style={{ padding: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
                   <h3 style={{ fontWeight: '600', marginBottom: '10px', color: '#1e1e1e' }}>Health impact (full adoption, no stacking)</h3>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', color: '#374151' }}>
                     {[{ label: 'ICS', key: 'ics' }, { label: 'LPG', key: 'lpg' }, { label: 'Solar', key: 'solar' }].map(({ label, key }) => (
@@ -557,17 +566,28 @@
               </div>
 
               {/* Model notes — sharp corners */}
-              <div style={{ marginTop: '20px', padding: '16px', background: '#f3f4f6', borderRadius: 0, fontSize: '13px', color: '#6b7280', lineHeight: '1.6' }}>
+              <div style={{ marginTop: '20px', padding: '16px', background: '#f3f4f6', fontSize: '13px', color: '#6b7280', lineHeight: '1.6' }}>
                 <strong style={{ color: '#374151' }}>Model assumptions:</strong> Equipment lifespans are ICS: 5 years, LPG: 10 years, Solar: 7 years. Financing terms based on rural MFI and PAYG market data from East Africa. Time value only realized when time is reallocated to paid work. Stove stacking reduces all benefits proportionally. LPG economics depend heavily on local fuel prices and supply chain reliability.
               </div>
 
               {/* Footer */}
               <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <img src="Caribou_Logo_Primary_Black.png" alt="Caribou" style={{ height: '20px', opacity: 0.4 }} />
-                <span style={{ fontSize: '12px', color: '#9ca3af' }}><a href="https://caribou.global" target="_blank" style={{ fontSize: '12px', color: '#FF5533', textDecoration: 'none' }}>caribou.global</a>
-
-
-</span>
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                  <a href="https://caribou.global" target="_blank" rel="noopener noreferrer">
+                    <img src="Caribou_Logo_Primary_Black.png" alt="Caribou" style={{ height: '20px', opacity: 0.5 }} />
+                  </a>
+                  <a href="https://shellfoundation.org" target="_blank" rel="noopener noreferrer">
+                    <img src="../Caribou Logos/Shell_Foundation_Logo.jpg" alt="Shell Foundation" style={{ height: '20px', opacity: 0.7 }} />
+                  </a>
+                  <a href="https://www.gov.uk/government/organisations/foreign-commonwealth-development-office" target="_blank" rel="noopener noreferrer">
+                    <img src="../Caribou Logos/UKaid.png" alt="UKaid" style={{ height: '20px', opacity: 0.7 }} />
+                  </a>
+                </div>
+                <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+                  <span>© 2026 Caribou. All rights reserved.</span>
+                  <span style={{ margin: '0 8px' }}>·</span>
+                  <a href="https://caribou.global/contact/" target="_blank" rel="noopener noreferrer" style={{ color: '#FF5533', textDecoration: 'none' }}>Contact us</a>
+                </div>
               </div>
 
             </div>
