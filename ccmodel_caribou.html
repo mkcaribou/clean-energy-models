@@ -220,19 +220,22 @@
           const lpgNet   = lpgSav   + lpgTime   - lpgCapital;
           const solarNet = solarSav + solarTime - solarCapital;
 
-          const icsROI   = icsCapital   > 0 ? (icsNet   / icsCapital)   * 100 : 0;
-          const lpgROI   = lpgCapital   > 0 ? (lpgNet   / lpgCapital)   * 100 : 0;
-          const solarROI = solarCapital > 0 ? (solarNet / solarCapital) * 100 : 0;
+          // Annual ROI = net annual benefit / upfront capital cost (not annualized)
+          const icsROI   = technologies.ics.capitalCost   > 0 ? (icsNet   / technologies.ics.capitalCost)   * 100 : 0;
+          const lpgROI   = technologies.lpg.capitalCost   > 0 ? (lpgNet   / technologies.lpg.capitalCost)   * 100 : 0;
+          const solarROI = technologies.solar.capitalCost > 0 ? (solarNet / technologies.solar.capitalCost) * 100 : 0;
 
-          const icsPayback   = icsNet   > 0 ? technologies.ics.capitalCost   / icsNet   : null;
-          const lpgPayback   = lpgNet   > 0 ? technologies.lpg.capitalCost   / lpgNet   : null;
-          const solarPayback = solarNet > 0 ? technologies.solar.capitalCost / solarNet : null;
+          // Payback = upfront capital / gross annual savings (fuel + time, before capital amortization)
+          const icsPayback   = icsNet   > 0 ? technologies.ics.capitalCost   / (icsSav   + icsTime)   : null;
+          const lpgPayback   = lpgNet   > 0 ? technologies.lpg.capitalCost   / (lpgSav   + lpgTime)   : null;
+          const solarPayback = solarNet > 0 ? technologies.solar.capitalCost / (solarSav + solarTime) : null;
 
           const getVerdict = (net, roi, payback) => {
             if (net < 0) return { icon: '⛔', label: 'Negative return', summary: `Costs exceed benefits by $${Math.abs(Math.round(net))}/year`, color: B.red, bg: '#fee2e2', border: '#fecaca' };
-            if (roi > 100 && payback && payback < 2) return { icon: '✓✓', label: 'Excellent investment', summary: `${Math.round(roi)}% ROI, pays back in ${payback.toFixed(1)} years`, color: '#15803d', bg: '#dcfce7', border: '#bbf7d0' };
-            if (roi > 50) return { icon: '✓', label: 'Good investment', summary: `${Math.round(roi)}% ROI${payback ? `, pays back in ${payback.toFixed(1)} years` : ''}`, color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' };
-            if (roi > 0)  return { icon: '○', label: 'Marginal return', summary: `${Math.round(roi)}% ROI — positive but modest`, color: '#d97706', bg: '#fef3c7', border: '#fde68a' };
+            if (roi > 50 && payback && payback < 2) return { icon: '✓✓', label: 'Excellent investment', summary: `${Math.round(roi)}% annual ROI, pays back in ${payback.toFixed(1)} years`, color: '#15803d', bg: '#dcfce7', border: '#bbf7d0' };
+            if (roi > 50) return { icon: '✓✓', label: 'Excellent investment', summary: `${Math.round(roi)}% annual ROI${payback ? `, pays back in ${payback.toFixed(1)} years` : ''}`, color: '#15803d', bg: '#dcfce7', border: '#bbf7d0' };
+            if (roi > 20) return { icon: '✓', label: 'Good investment', summary: `${Math.round(roi)}% annual ROI${payback ? `, pays back in ${payback.toFixed(1)} years` : ''}`, color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' };
+            if (roi > 0)  return { icon: '○', label: 'Marginal return', summary: `${Math.round(roi)}% annual ROI — positive but modest`, color: '#d97706', bg: '#fef3c7', border: '#fde68a' };
             return { icon: '○', label: 'Near break-even', summary: 'Benefits roughly equal costs', color: '#6b7280', bg: '#f3f4f6', border: '#e5e7eb' };
           };
 
@@ -314,7 +317,7 @@
                     <div style={{ fontSize: '22px', fontWeight: '700', color: netBenefit >= 0 ? '#15803d' : B.red }}>{netBenefit >= 0 ? '+' : ''}${Math.round(netBenefit)}</div>
                   </div>
                   <div style={{ background: '#f9fafb', padding: '10px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>ROI</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Annual ROI</div>
                     <div style={{ fontSize: '22px', fontWeight: '700', color: roi >= 0 ? '#15803d' : B.red }}>{Math.round(roi)}%</div>
                   </div>
                 </div>
@@ -388,7 +391,7 @@
               {/* Instructions — dark purple, sharp corners */}
               <div style={{ padding: '16px 20px', background: B.hazyPlum, marginBottom: '20px', fontSize: '15px', color: 'white', lineHeight: '1.6' }}>
                 <p style={{ marginBottom: '10px' }}>
-                  <strong>What this model does:</strong> Estimates the annual economic return of clean cooking technologies for low-income households. It compares fuel costs, time savings, and capital costs to calculate net benefit, ROI, and payback period.
+                  <strong>What this model does:</strong> Estimates the financial return of clean cooking technologies for low-income households. It compares fuel costs, time savings, and capital costs to calculate net benefit, ROI, and payback period.
                 </p>
                 <p>
                   <strong>How to use it:</strong> Set baseline fuel costs and time burdens to reflect current household conditions. Choose a payment method and adjust financing terms. The "stove stacking" slider accounts for continued use of traditional stoves alongside modern alternatives.
