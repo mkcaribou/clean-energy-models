@@ -410,7 +410,7 @@
                   {renderBar(-totalCosts,  B.fuschia,                                                     `-$${Math.round(totalCosts)}`,                          0,                 'Costs')}
                   {renderBar(incomeIncrease, B.mint,                                                      `+$${Math.round(incomeIncrease)}`,                      barWidth + gap,    'Income')}
                   {renderBar(costSavings,  B.springGreen,                                                 `+$${Math.round(costSavings)}`,                         (barWidth+gap)*2,  'Savings')}
-                  {renderBar(netBenefit,   netBenefit >= 0 ? B.clover : B.red,                            `${netBenefit >= 0 ? '+' : ''}$${Math.round(netBenefit)}`, (barWidth+gap)*3, 'Net')}
+                  {renderBar(netBenefit,   netBenefit >= 0 ? B.clover : B.red,                            `${netBenefit >= 0 ? '+' : '-'}$${Math.abs(Math.round(netBenefit))}`, (barWidth+gap)*3, 'Net')}
                 </div>
               </div>
             );
@@ -847,7 +847,7 @@
                 <div style={{ padding: '16px', background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
                   <h3 style={{ fontWeight: '600', marginBottom: '10px', color: '#1e1e1e' }}>Impact with solar irrigation</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#374151' }}>
-                    <div><strong>Yield increase:</strong> +11-17% (at {technologyReliability}% reliability)</div>
+                    <div><strong>Yield increase:</strong> +{Math.round(pumps.small.yieldIncrease * technologyReliability)}-{Math.round(pumps.drip.yieldIncrease * technologyReliability)}% (at {technologyReliability}% reliability)</div>
                     <div><strong>Growing seasons:</strong> Up to {Math.max(smallMetrics.effectiveSeasons, mediumMetrics.effectiveSeasons, dripMetrics.effectiveSeasons).toFixed(1)} seasons</div>
                     <div><strong>Water efficiency:</strong> 2.5-5.0x improvement over manual</div>
                     <div><strong>Environmental:</strong> Zero diesel emissions</div>
