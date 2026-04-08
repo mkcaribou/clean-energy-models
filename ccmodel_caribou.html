@@ -265,9 +265,9 @@
                 <div style={{ position: 'relative', width: `${bw * 4 + gap * 3}px`, height: `${H + 22}px` }}>
                   <div style={{ position: 'absolute', width: '100%', borderTop: '1px solid #9ca3af', top: `${zero}px` }} />
                   {renderBar(-capitalCost, B.fuschia,     `-$${Math.round(capitalCost)}`,                                              0,             'Capital')}
-                  {renderBar(fuelSavings,  fuelSavings >= 0 ? B.mint : B.red, `${fuelSavings >= 0 ? '+' : ''}$${Math.round(fuelSavings)}`, bw + gap,      'Fuel')}
+                  {renderBar(fuelSavings,  fuelSavings >= 0 ? B.mint : B.red, `${fuelSavings >= 0 ? '+' : '-'}$${Math.abs(Math.round(fuelSavings))}`, bw + gap,      'Fuel')}
                   {renderBar(timeValue,    B.springGreen, `+$${Math.round(timeValue)}`,                                               (bw+gap)*2,    'Time')}
-                  {renderBar(netBenefit,   netBenefit >= 0 ? B.clover : B.red, `${netBenefit >= 0 ? '+' : ''}$${Math.round(netBenefit)}`, (bw+gap)*3,    'Net')}
+                  {renderBar(netBenefit,   netBenefit >= 0 ? B.clover : B.red, `${netBenefit >= 0 ? '+' : '-'}$${Math.abs(Math.round(netBenefit))}`, (bw+gap)*3,    'Net')}
                 </div>
               </div>
             );
@@ -315,7 +315,7 @@
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
                   <div style={{ background: '#f9fafb', padding: '10px', textAlign: 'center' }}>
                     <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Net annual benefit</div>
-                    <div style={{ fontSize: '22px', fontWeight: '700', color: netBenefit >= 0 ? '#15803d' : B.red }}>{netBenefit >= 0 ? '+' : ''}${Math.round(netBenefit)}</div>
+                    <div style={{ fontSize: '22px', fontWeight: '700', color: netBenefit >= 0 ? '#15803d' : B.red }}>{netBenefit >= 0 ? '+' : '-'}${Math.abs(Math.round(netBenefit))}</div>
                   </div>
                   <div style={{ background: '#f9fafb', padding: '10px', textAlign: 'center' }}>
                     <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Annual ROI</div>
@@ -330,7 +330,7 @@
                   <div style={{ fontSize: '13px', padding: '12px', background: '#f0fdf4' }}>
                     <div style={{ fontWeight: '600', color: '#166534', marginBottom: '6px' }}>Annual benefits</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                      <span>Fuel savings:</span><span style={{ fontWeight: '500', color: fuelSavings >= 0 ? '#166534' : B.red }}>{fuelSavings >= 0 ? '+' : ''}${Math.round(fuelSavings)}</span>
+                      <span>Fuel savings:</span><span style={{ fontWeight: '500', color: fuelSavings >= 0 ? '#166534' : B.red }}>{fuelSavings >= 0 ? '+' : '-'}${Math.abs(Math.round(fuelSavings))}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>Time value:</span><span style={{ fontWeight: '500', color: '#166534' }}>+${Math.round(timeValue)}</span>
