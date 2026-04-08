@@ -311,8 +311,8 @@
 
             const incomeIncrease = yieldImprovementIncome + additionalSeasonIncome;
 
-            const scalingFactor = plotSize / baseline.refPlotSize;
-            const costSavings = baselineIrrigCost * scalingFactor;
+            // costSavings = user's actual annual irrigation cost for their plot (no scaling)
+            const costSavings = baselineIrrigCost;
 
             const totalCosts = annualCapitalCost + totalMaintenance;
             const totalBenefit = incomeIncrease + costSavings;
@@ -321,8 +321,9 @@
             // Annual ROI = net annual benefit / upfront capital cost (not annualized)
             const roi = totalCapitalBase > 0 ? (netBenefit / totalCapitalBase) * 100 : 0;
 
-            // Payback = upfront capital / gross operational flows (benefits net of ongoing maintenance, before capital amortization)
-            const paybackYears = netBenefit > 0 ? totalCapitalBase / (incomeIncrease + costSavings - totalMaintenance) : null;
+            // Payback = total amount paid (financing-adjusted) / gross operational flows (benefits net of ongoing maintenance, before capital amortization)
+            // Note: for PAYG, this will exceed the lease term if the premium is high enough — they are different things.
+            const paybackYears = netBenefit > 0 ? totalCapitalCost / (incomeIncrease + costSavings - totalMaintenance) : null;
 
             const affordability = checkAffordability(financing.monthlyPayment, financing.depositRequired, pump.name, totalCapitalBase);
 
@@ -745,11 +746,30 @@
                       <option value="manual">{contexts.manual.label}</option>
                       <option value="established">{contexts.established.label}</option>
                     </select>
-                    <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '6px' }}>{baseline.description}</p>
+
+                    {/* Explainer: what this setting changes */}
+                    <div style={{ marginTop: '10px', padding: '12px', background: 'white', border: '1px solid #e5e7eb', fontSize: '13px', color: '#374151', lineHeight: '1.6' }}>
+                      <div style={{ fontWeight: '600', marginBottom: '6px', color: '#1e1e1e' }}>This sets the counterfactual — what the farmer achieves without solar irrigation:</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                        <span>Baseline crop yield:</span>
+                        <span style={{ fontWeight: '600' }}>{baseline.baseYield} kg/ha/season</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                        <span>Growing seasons without solar:</span>
+                        <span style={{ fontWeight: '600' }}>{baseline.baseSeasons}/year</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Max seasons solar can reach:</span>
+                        <span style={{ fontWeight: '600' }}>{pumps.small.maxSeasons}–{pumps.drip.maxSeasons}/year (by technology)</span>
+                      </div>
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280', borderTop: '1px solid #e5e7eb', paddingTop: '6px' }}>
+                        Income gains are calculated as the difference between what the farmer earns with and without solar irrigation. A higher baseline yield means each percentage-point improvement is worth more in absolute terms.
+                      </div>
+                    </div>
                   </div>
 
                   <SliderControl label="Plot size" value={plotSize} onChange={setPlotSize} min={0.2} max={3} step={0.1} unit=" ha" helpText="Cultivated area available for irrigation" />
-                  <SliderControl label="Baseline irrigation costs" value={baselineIrrigCost} onChange={setBaselineIrrigCost} min={0} max={200} step={5} unit=" USD/yr" helpText="Current annual spending on manual/diesel irrigation" />
+                  <SliderControl label="Baseline irrigation costs" value={baselineIrrigCost} onChange={setBaselineIrrigCost} min={0} max={200} step={5} unit=" USD/yr" helpText="Your actual total annual spending on irrigation for this plot (diesel, labor, water fees). Treated as a full cost saving when switching to solar." />
 
                   <div style={{ marginBottom: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>

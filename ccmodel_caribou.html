@@ -225,10 +225,11 @@
           const lpgROI   = technologies.lpg.capitalCost   > 0 ? (lpgNet   / technologies.lpg.capitalCost)   * 100 : 0;
           const solarROI = technologies.solar.capitalCost > 0 ? (solarNet / technologies.solar.capitalCost) * 100 : 0;
 
-          // Payback = upfront capital / gross annual savings (fuel + time, before capital amortization)
-          const icsPayback   = icsNet   > 0 ? technologies.ics.capitalCost   / (icsSav   + icsTime)   : null;
-          const lpgPayback   = lpgNet   > 0 ? technologies.lpg.capitalCost   / (lpgSav   + lpgTime)   : null;
-          const solarPayback = solarNet > 0 ? technologies.solar.capitalCost / (solarSav + solarTime) : null;
+          // Payback = total amount paid (financing-adjusted) / gross annual savings (fuel + time, before capital amortization)
+          // For PAYG/loans, this correctly produces a longer payback than cash upfront.
+          const icsPayback   = icsNet   > 0 ? icsF.totalCost   / (icsSav   + icsTime)   : null;
+          const lpgPayback   = lpgNet   > 0 ? lpgF.totalCost   / (lpgSav   + lpgTime)   : null;
+          const solarPayback = solarNet > 0 ? solarF.totalCost / (solarSav + solarTime) : null;
 
           const getVerdict = (net, roi, payback) => {
             if (net < 0) return { icon: '⛔', label: 'Negative return', summary: `Costs exceed benefits by $${Math.abs(Math.round(net))}/year`, color: B.red, bg: '#fee2e2', border: '#fecaca' };
