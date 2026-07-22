@@ -54,7 +54,7 @@
             springGreen: '#B6D3B6',
             fuschia:     '#BC9BCE',
             naranja:     '#FFA31D',
-            lavender:    '#9278DD',
+            lavender:    '#8777B2',
             clover:      '#287F66',
             red:         '#C0392B',
         };
@@ -108,7 +108,6 @@
           const getFacilities = () => ({
             mobile: {
               name: "Mobile cold unit",
-              icon: "🚐",
               subtitle: "Refrigerated van or portable container",
               description: "A solar-powered refrigerated vehicle or small portable container that can be moved to farms, markets, or collection points. Ideal for last-mile cold chain or areas without permanent infrastructure.",
               specs: "0.5-1 ton capacity (~25-50 crates). Can serve multiple locations. Requires driver/operator.",
@@ -117,11 +116,10 @@
               capacityTons: 1,
               optimalMembersMin: 15,
               optimalMembersMax: 50,
-              color: "#3b82f6"
+              color: "#6DC695"
             },
             small: {
               name: "Walk-in cold room",
-              icon: "🏠",
               subtitle: "Village-level solar cold room",
               description: "A permanent walk-in cold storage unit powered by rooftop solar panels with battery backup. The standard model for village markets and cooperatives, similar to ColdHubs facilities in Nigeria.",
               specs: "3-5 ton capacity (~150-250 crates). Maintains 4-10°C. Typically located at markets or collection centers.",
@@ -130,11 +128,10 @@
               capacityTons: 3,
               optimalMembersMin: 40,
               optimalMembersMax: 150,
-              color: "#f97316"
+              color: "#FFA31D"
             },
             large: {
               name: "Regional cold storage",
-              icon: "🏭",
               subtitle: "Multi-zone aggregation facility",
               description: "A larger permanent facility serving multiple communities or a wholesale market. May include multiple temperature zones, pre-cooling areas, and sorting/packing space.",
               specs: "10-30 ton capacity (~500-1500 crates). Often grid-connected with solar backup. May employ 2-4 staff.",
@@ -143,7 +140,7 @@
               capacityTons: 10,
               optimalMembersMin: 100,
               optimalMembersMax: 300,
-              color: "#8b5cf6"
+              color: "#8777B2"
             }
           });
 
@@ -156,7 +153,7 @@
                 status: 'underutilized',
                 label: 'Under-utilized',
                 message: `Only ${memberCount} users for a facility designed for ${facility.optimalMembersMin}+. Fixed costs are spread across too few people, making per-user economics unfavorable.`,
-                color: '#f59e0b',
+                color: '#d97706',
                 accessFactor: 1.0
               };
             }
@@ -166,7 +163,7 @@
                 status: 'overutilized',
                 label: 'Over capacity',
                 message: `${memberCount} users exceeds the ${facility.optimalMembersMax} this facility can comfortably serve. Expect queuing, reduced access, and potential spoilage during peak times.`,
-                color: '#ef4444',
+                color: '#C0392B',
                 accessFactor: accessFactor
               };
             }
@@ -174,7 +171,7 @@
               status: 'optimal',
               label: 'Good fit',
               message: `${memberCount} users is within the optimal range of ${facility.optimalMembersMin}-${facility.optimalMembersMax} for this facility type.`,
-              color: '#22c55e',
+              color: '#287F66',
               accessFactor: 1.0
             };
           };
@@ -220,7 +217,7 @@
                 label: 'Not viable', 
                 explainer: `Facility loses $${Math.round(sustainabilityGap)}/mo. Needs more users or higher subsidy.`,
                 bg: '#fee2e2', 
-                color: '#dc2626' 
+                color: '#C0392B' 
               };
             }
             if (!coopSustainable) {
@@ -239,8 +236,8 @@
                 icon: '○',
                 label: 'Oversized',
                 explainer: 'Facility works but is larger than needed for this user count.',
-                bg: '#dbeafe',
-                color: '#1d4ed8'
+                bg: '#E8E6E9',
+                color: '#604D64'
               };
             }
             if (netMonthlyGain < 0) {
@@ -260,7 +257,7 @@
                 label: 'Excellent', 
                 explainer: `Sustainable facility with strong ${Math.round(incomeChangePercent)}% farmer income uplift.`,
                 bg: '#dcfce7', 
-                color: '#15803d' 
+                color: '#287F66' 
               };
             }
             if (incomeChangePercent >= 5) {
@@ -270,7 +267,7 @@
                 label: 'Good investment', 
                 explainer: `Sustainable facility with ${Math.round(incomeChangePercent)}% farmer income uplift.`,
                 bg: '#dcfce7', 
-                color: '#16a34a' 
+                color: '#287F66' 
               };
             }
             return { 
@@ -278,8 +275,8 @@
               icon: '○', 
               label: 'Viable', 
               explainer: 'Facility is sustainable with modest farmer benefit.',
-              bg: '#dbeafe', 
-              color: '#1d4ed8' 
+              bg: '#E8E6E9',
+              color: '#604D64' 
             };
           };
 
@@ -427,9 +424,9 @@
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <div style={{ position: 'relative', width: `${barWidth * 3 + gap * 2}px`, height: `${chartHeight + 22}px` }}>
                   <div style={{ position: 'absolute', width: '100%', borderTop: '1px solid #9ca3af', top: `${zeroLine}px` }} />
-                  {renderBar(benefits, '#22c55e', `+$${benefits.toFixed(2)}`, 0, 'Benefits')}
-                  {renderBar(-costs, '#ef4444', `-$${costs.toFixed(2)}`, barWidth + gap, 'Fees')}
-                  {renderBar(netGain, netGain >= 0 ? '#15803d' : '#dc2626', `${netGain >= 0 ? '+' : '-'}$${Math.abs(netGain).toFixed(2)}`, (barWidth + gap) * 2, 'Net')}
+                  {renderBar(benefits, '#6DC695', `+$${benefits.toFixed(2)}`, 0, 'Benefits')}
+                  {renderBar(-costs, '#BC9BCE', `-$${costs.toFixed(2)}`, barWidth + gap, 'Fees')}
+                  {renderBar(netGain, netGain >= 0 ? '#287F66' : '#C0392B', `${netGain >= 0 ? '+' : '-'}$${Math.abs(netGain).toFixed(2)}`, (barWidth + gap) * 2, 'Net')}
                 </div>
               </div>
             );
@@ -445,13 +442,12 @@
             return (
               <div style={{ padding: '16px', background: 'white', border: `2px solid ${facility.color}`, borderRadius: '0', position: 'relative' }}>
                 {isBest && (
-                  <div style={{ position: 'absolute', top: '-12px', right: '14px', background: '#15803d', color: 'white', fontSize: '12px', fontWeight: '700', padding: '5px 12px', borderRadius: '0' }}>BEST FIT</div>
+                  <div style={{ position: 'absolute', top: '-12px', right: '14px', background: '#287F66', color: 'white', fontSize: '12px', fontWeight: '700', padding: '5px 12px', borderRadius: '0' }}>BEST FIT</div>
                 )}
                 
                 {/* Header */}
                 <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: `2px solid ${facility.color}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '22px' }}>{facility.icon}</span>
                     <div style={{ fontWeight: '700', fontSize: '16px', color: '#1f2937' }}>{facility.name}</div>
                   </div>
                   <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '6px' }}>{facility.subtitle}</div>
@@ -481,7 +477,7 @@
 
                 {/* Facility sustainability */}
                 <div style={{ padding: '12px', background: coopSustainable ? '#f0fdf4' : '#fef2f2', border: coopSustainable ? '1px solid #bbf7d0' : '2px solid #fecaca', borderRadius: '0', marginBottom: '14px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: coopSustainable ? '#166534' : '#dc2626', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: coopSustainable ? '#287F66' : '#C0392B', marginBottom: '8px' }}>
                     {coopSustainable ? '✓ Facility financially sustainable' : '⛔ Facility not financially sustainable'}
                   </div>
                   <div style={{ fontSize: '12px', color: '#6b7280' }}>
@@ -491,7 +487,7 @@
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                       <span>Total fees from {memberCount} users:</span><span style={{ fontWeight: '500' }}>${Math.round(totalMemberFees)}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', color: coopSustainable ? '#166534' : '#dc2626', paddingTop: '6px', borderTop: '1px solid #e5e7eb', marginTop: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '600', color: coopSustainable ? '#287F66' : '#C0392B', paddingTop: '6px', borderTop: '1px solid #e5e7eb', marginTop: '4px' }}>
                       <span>{coopSustainable ? 'Monthly surplus:' : 'Monthly shortfall:'}</span>
                       <span>{coopSustainable ? `+$${Math.round(sustainabilitySurplus)}` : `-$${Math.round(sustainabilityGap)}`}</span>
                     </div>
@@ -502,14 +498,14 @@
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
                   <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '0', textAlign: 'center' }}>
                     <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Farmer net gain</div>
-                    <div style={{ fontSize: '22px', fontWeight: '700', color: netMonthlyGain >= 0 ? '#15803d' : '#dc2626' }}>
+                    <div style={{ fontSize: '22px', fontWeight: '700', color: netMonthlyGain >= 0 ? '#287F66' : '#C0392B' }}>
                       {netMonthlyGain >= 0 ? '+' : '-'}${Math.abs(netMonthlyGain).toFixed(2)}
                     </div>
                     <div style={{ fontSize: '11px', color: '#9ca3af' }}>per month</div>
                   </div>
                   <div style={{ background: '#f9fafb', padding: '12px', borderRadius: '0', textAlign: 'center' }}>
                     <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Income uplift</div>
-                    <div style={{ fontSize: '22px', fontWeight: '700', color: incomeChangePercent >= 0 ? '#15803d' : '#dc2626' }}>
+                    <div style={{ fontSize: '22px', fontWeight: '700', color: incomeChangePercent >= 0 ? '#287F66' : '#C0392B' }}>
                       {incomeChangePercent >= 0 ? '+' : ''}{incomeChangePercent.toFixed(1)}%
                     </div>
                     <div style={{ fontSize: '11px', color: '#9ca3af' }}>vs. baseline</div>
@@ -538,7 +534,7 @@
                     <span style={{ fontWeight: '500' }}>{cratesPerMonth.toFixed(1)} × {avgDaysStored}d × ${usageFeePerCrateDay}</span>
                   </div>
                   {effectiveStorageAccess < 1 && (
-                    <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '8px', padding: '6px', background: '#fef2f2', borderRadius: '0' }}>
+                    <div style={{ fontSize: '12px', color: '#C0392B', marginTop: '8px', padding: '6px', background: '#fef2f2', borderRadius: '0' }}>
                       ⚠ Storage access reduced to {Math.round(effectiveStorageAccess * 100)}% due to facility overcrowding
                     </div>
                   )}
@@ -547,7 +543,7 @@
                 {/* Benefit/cost breakdown */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div style={{ fontSize: '13px', padding: '12px', background: '#f0fdf4', borderRadius: '0' }}>
-                    <div style={{ fontWeight: '600', color: '#166534', marginBottom: '6px' }}>Monthly benefits</div>
+                    <div style={{ fontWeight: '600', color: '#287F66', marginBottom: '6px' }}>Monthly benefits</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px', fontSize: '12px' }}>
                       <span>Less spoilage:</span><span>+${lossReductionValue.toFixed(2)}</span>
                     </div>
@@ -606,7 +602,7 @@
                   This is the total number of farmers, traders, or other users who will store produce in the facility and pay usage fees. 
                   More users means more revenue to cover costs, but also more demand on limited storage capacity.
                 </div>
-                <div style={{ fontSize: '13px', color: '#0369a1', marginBottom: '10px', padding: '8px 12px', background: '#f0f9ff', borderRadius: '0' }}>
+                <div style={{ fontSize: '13px', color: '#4A334E', marginBottom: '10px', padding: '8px 12px', background: '#f5f0f6', borderRadius: '0' }}>
                   <strong>Total storage demand:</strong> {memberCount} farmers × {cratesPerMemberMonthly.toFixed(1)} crates each = <strong>{Math.round(cratesPerMemberMonthly * memberCount)} crates/month</strong> ({Math.round(kgStoredMonthly * memberCount)} kg)
                 </div>
                 <input 
@@ -619,15 +615,15 @@
                   }}
                 />
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '12px' }}>
-                  <div style={{ textAlign: 'center', padding: '6px 12px', background: memberCount <= 50 ? '#dbeafe' : '#f1f5f9', borderRadius: '0', color: memberCount <= 50 ? '#1e40af' : '#94a3b8' }}>
+                  <div style={{ textAlign: 'center', padding: '6px 12px', background: memberCount <= 50 ? '#E8E6E9' : '#f1f5f9', borderRadius: '0', color: memberCount <= 50 ? '#287F66' : '#94a3b8' }}>
                     <div style={{ fontWeight: memberCount <= 50 ? '600' : '400' }}>Small group</div>
                     <div style={{ fontSize: '11px' }}>10-50 farmers</div>
                   </div>
-                  <div style={{ textAlign: 'center', padding: '6px 12px', background: memberCount > 50 && memberCount <= 120 ? '#fed7aa' : '#f1f5f9', borderRadius: '0', color: memberCount > 50 && memberCount <= 120 ? '#c2410c' : '#94a3b8' }}>
+                  <div style={{ textAlign: 'center', padding: '6px 12px', background: memberCount > 50 && memberCount <= 120 ? '#E8E6E9' : '#f1f5f9', borderRadius: '0', color: memberCount > 50 && memberCount <= 120 ? '#B15C00' : '#94a3b8' }}>
                     <div style={{ fontWeight: memberCount > 50 && memberCount <= 120 ? '600' : '400' }}>Medium cooperative</div>
                     <div style={{ fontSize: '11px' }}>50-120 farmers</div>
                   </div>
-                  <div style={{ textAlign: 'center', padding: '6px 12px', background: memberCount > 120 ? '#e9d5ff' : '#f1f5f9', borderRadius: '0', color: memberCount > 120 ? '#7c3aed' : '#94a3b8' }}>
+                  <div style={{ textAlign: 'center', padding: '6px 12px', background: memberCount > 120 ? '#E8E6E9' : '#f1f5f9', borderRadius: '0', color: memberCount > 120 ? '#604D64' : '#94a3b8' }}>
                     <div style={{ fontWeight: memberCount > 120 ? '600' : '400' }}>Large federation</div>
                     <div style={{ fontSize: '11px' }}>120+ farmers</div>
                   </div>
@@ -701,9 +697,9 @@
                     <input type="range" min={50} max={500} step={25} value={monthlyProduceValue} onChange={(e) => setMonthlyProduceValue(parseFloat(e.target.value))}
                       style={{ width: '100%', height: '4px', background: `linear-gradient(to right, #4A334E 0%, #4A334E ${((monthlyProduceValue - 50) / 450) * 100}%, #e5e7eb ${((monthlyProduceValue - 50) / 450) * 100}%, #e5e7eb 100%)`, borderRadius: '0', outline: 'none', WebkitAppearance: 'none' }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', padding: '8px', background: '#fff', borderRadius: '0', border: '1px solid #e5e7eb', fontSize: '11px' }}>
-                      <div style={{ textAlign: 'center', color: monthlyProduceValue <= 100 ? '#3b82f6' : '#9ca3af', fontWeight: monthlyProduceValue <= 100 ? '600' : '400' }}>🌱 Subsistence<br/>$50-100/mo</div>
-                      <div style={{ textAlign: 'center', color: monthlyProduceValue > 100 && monthlyProduceValue <= 250 ? '#f97316' : '#9ca3af', fontWeight: monthlyProduceValue > 100 && monthlyProduceValue <= 250 ? '600' : '400' }}>🥬 Smallholder<br/>$100-250/mo</div>
-                      <div style={{ textAlign: 'center', color: monthlyProduceValue > 250 ? '#8b5cf6' : '#9ca3af', fontWeight: monthlyProduceValue > 250 ? '600' : '400' }}>🚜 Commercial<br/>$250+/mo</div>
+                      <div style={{ textAlign: 'center', color: monthlyProduceValue <= 100 ? '#6DC695' : '#9ca3af', fontWeight: monthlyProduceValue <= 100 ? '600' : '400' }}>Subsistence<br/>$50-100/mo</div>
+                      <div style={{ textAlign: 'center', color: monthlyProduceValue > 100 && monthlyProduceValue <= 250 ? '#FFA31D' : '#9ca3af', fontWeight: monthlyProduceValue > 100 && monthlyProduceValue <= 250 ? '600' : '400' }}>Smallholder<br/>$100-250/mo</div>
+                      <div style={{ textAlign: 'center', color: monthlyProduceValue > 250 ? '#8777B2' : '#9ca3af', fontWeight: monthlyProduceValue > 250 ? '600' : '400' }}>Commercial<br/>$250+/mo</div>
                     </div>
                   </div>
                   
@@ -747,7 +743,7 @@
 
               {/* No viable warning */}
               {!bestOption && (
-                <div style={{ padding: '14px', background: '#fef2f2', borderRadius: '0', marginBottom: '20px', border: '1px solid #fecaca', fontSize: '14px', color: '#dc2626' }}>
+                <div style={{ padding: '14px', background: '#fef2f2', borderRadius: '0', marginBottom: '20px', border: '1px solid #fecaca', fontSize: '14px', color: '#C0392B' }}>
                   <strong>⚠ No well-matched sustainable option found.</strong> Consider: increasing the subsidy percentage, adding more users, raising usage fees, or selecting farmers with higher production volumes.
                 </div>
               )}
